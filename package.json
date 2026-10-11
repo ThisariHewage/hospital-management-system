@@ -1,0 +1,16 @@
+{
+  "name": "hospital-management-system",
+  "version": "1.0.0",
+  "description": "Hospital Management System (HMS) - Full Stack Application",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install && npm --prefix server install && npm --prefix client install",
+    "server": "npm --prefix server run dev",
+    "client": "npm --prefix client run dev",
+    "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
+    "db:init": "node server/src/utils/initDb.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
