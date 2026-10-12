@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
                     setUser(response.data.user);
                 }
             } catch (err) {
-                // Fallback or unauthenticated
+                // Keep default demo user if unauthenticated
             } finally {
                 setLoading(false);
             }
@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
     };
 
     // Demo role switcher for instant preview of any persona
-    const switchDemoRole = (newRole) => {
+    const switchDemoRole = async (newRole) => {
         const roleProfiles = {
             ADMIN: { id: 1, username: 'admin', role: 'ADMIN', email: 'admin@hospital.com', title: 'System Administrator' },
             DOCTOR: { id: 2, username: 'dr_smith', role: 'DOCTOR', email: 'smith@hospital.com', title: 'Dr. Robert Smith (Cardiology)' },
@@ -68,6 +68,13 @@ export const AuthProvider = ({ children }) => {
 
         if (roleProfiles[newRole]) {
             setUser(roleProfiles[newRole]);
+        }
+
+        try {
+            // Synchronize session cookie with backend
+            await api.post('/auth/demo-switch', { role: newRole });
+        } catch (err) {
+            // Soft fail if offline
         }
     };
 
