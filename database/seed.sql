@@ -15,17 +15,16 @@ INSERT INTO roles (id, name, description) VALUES
 (7, 'ACCOUNTANT', 'Financial officer handling billing, payments and revenue reports')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
--- 2. Insert Users (Default password: password123, bcrypt hash: $2b$10$8K1p/a0dL1LXMIgoEDFrwOfMQbVq3q6e9YFpPn4hYhD8P2N/kYFpG)
--- Hash generated for 'password123': $2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW
+-- 2. Insert Users (Default password: password123, bcrypt hash: $2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK)
 INSERT INTO users (id, username, email, password_hash, role_id, is_active) VALUES
-(1, 'admin', 'admin@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 1, TRUE),
-(2, 'dr_smith', 'smith@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 2, TRUE),
-(3, 'dr_sarah', 'sarah@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 2, TRUE),
-(4, 'nurse_joy', 'joy@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 3, TRUE),
-(5, 'reception_alex', 'alex@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 4, TRUE),
-(6, 'lab_david', 'david@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 5, TRUE),
-(7, 'pharma_emma', 'emma@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 6, TRUE),
-(8, 'account_marcus', 'marcus@hospital.com', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36WQoeG6Lruj3vjPGga31lW', 7, TRUE)
+(1, 'admin', 'admin@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 1, TRUE),
+(2, 'dr_smith', 'smith@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 2, TRUE),
+(3, 'dr_sarah', 'sarah@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 2, TRUE),
+(4, 'nurse_joy', 'joy@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 3, TRUE),
+(5, 'reception_alex', 'alex@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 4, TRUE),
+(6, 'lab_david', 'david@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 5, TRUE),
+(7, 'pharma_emma', 'emma@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 6, TRUE),
+(8, 'account_marcus', 'marcus@hospital.com', '$2a$10$EdKu4JC5ufMO4x1XG83k6.cDztDQjqkpgBiGOS3ap/AqW3Xk5t1fK', 7, TRUE)
 ON DUPLICATE KEY UPDATE username=VALUES(username);
 
 -- 3. Insert Departments

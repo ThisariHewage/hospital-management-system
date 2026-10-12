@@ -1,18 +1,24 @@
 import jwt from 'jsonwebtoken';
 
-export const authenticateToken = (req, res, next) => {
-    // Extract token from HTTP-only cookie first, fallback to Authorization header
+/**
+ * Authentication Middleware: Validates JWT signature and extracts user details onto req.user.
+ * Reads primarily from HTTP-only cookie 'jwt_token', with fallback to Bearer header.
+ */
+export const verifyToken = (req, res, next) => {
     const token = req.cookies?.jwt_token || req.headers.authorization?.split(' ')[1];
 
     if (!token) {
         return res.status(401).json({
             success: false,
-            message: 'Authentication token missing. Please log in.'
+            message: 'Authentication required. No token provided.'
         });
     }
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'super_secret_jwt_hms_key_2026_hospital');
+        const decoded = jwt.verify(
+            token,
+            process.env.JWT_SECRET || 'super_secret_jwt_hms_key_2026_hospital'
+        );
         req.user = decoded;
         next();
     } catch (error) {
@@ -22,3 +28,7 @@ export const authenticateToken = (req, res, next) => {
         });
     }
 };
+
+// Alias for backwards compatibility
+export const authenticateToken = verifyToken;
+export default verifyToken;

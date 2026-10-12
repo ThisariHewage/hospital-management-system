@@ -41,9 +41,11 @@ app.use((err, req, res, next) => {
     });
 });
 
-app.listen(PORT, async () => {
-    console.log(`🚀 Hospital Management System Backend running on http://localhost:${PORT}`);
-    await checkDbConnection();
-});
+if (process.env.NODE_ENV !== 'test') {
+    app.listen(PORT, async () => {
+        console.log(`🚀 Hospital Management System Backend running on http://localhost:${PORT}`);
+        await checkDbConnection();
+    });
+}
 
 export default app;
