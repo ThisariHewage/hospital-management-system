@@ -34,3 +34,6 @@ export const performBackup = async () => {
         throw error;
     }
 };
+
+export const runBackup = performBackup;
+
