@@ -1,49 +1,95 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from '../api/axios';
+import { getRoleDashboard } from '../utils/rbacConfig';
 
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-    const [user, setUser] = useState({
-        id: 1,
-        username: 'admin',
-        role: 'ADMIN',
-        email: 'admin@hospital.com'
-    });
-    const [loading, setLoading] = useState(false);
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
 
+    // Verify session on app initialization using HTTP-only cookie
     useEffect(() => {
+        let isMounted = true;
+
         const checkAuth = async () => {
             try {
                 const response = await api.get('/auth/me');
-                if (response.data?.user) {
+                if (isMounted && response.data?.user) {
                     setUser(response.data.user);
+                } else if (isMounted) {
+                    setUser(null);
                 }
             } catch (err) {
-                // Keep default demo user if unauthenticated
+                if (isMounted) {
+                    setUser(null);
+                }
             } finally {
-                setLoading(false);
+                if (isMounted) {
+                    setLoading(false);
+                }
             }
         };
+
         checkAuth();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
-    const login = async (username, password) => {
+    /**
+     * Authenticates credentials or registers new user if not yet in database.
+     * Validates username, custom password, and chosen role.
+     */
+    const login = async (identifier, password, role) => {
         setLoading(true);
         try {
-            const response = await api.post('/auth/login', { username, password });
-            setUser(response.data.user);
-            return { success: true };
+            const response = await api.post('/auth/login', {
+                username: identifier,
+                password,
+                role
+            });
+
+            const authenticatedUser = response.data.user;
+            setUser(authenticatedUser);
+
+            const dashboardRoute = authenticatedUser.dashboardRoute || getRoleDashboard(authenticatedUser.role);
+
+            return {
+                success: true,
+                user: authenticatedUser,
+                dashboardRoute
+            };
         } catch (error) {
             return {
                 success: false,
-                message: error.response?.data?.message || 'Login failed. Please check credentials.'
+                message: error.response?.data?.message || 'Authentication failed. Please check your credentials.'
             };
         } finally {
             setLoading(false);
         }
     };
 
+    /**
+     * Clears all users in MySQL database and resets session
+     */
+    const clearDatabaseUsers = async () => {
+        try {
+            const response = await api.post('/auth/clear-users');
+            setUser(null);
+            return { success: true, message: response.data.message };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Failed to clear users.'
+            };
+        }
+    };
+
+    /**
+     * Clears user session cookie on server and resets frontend user state.
+     */
     const logout = async () => {
         try {
             await api.post('/auth/logout');
@@ -51,30 +97,6 @@ export const AuthProvider = ({ children }) => {
             console.error('Logout error:', err);
         } finally {
             setUser(null);
-        }
-    };
-
-    // Demo role switcher for instant preview of any persona
-    const switchDemoRole = async (newRole) => {
-        const roleProfiles = {
-            ADMIN: { id: 1, username: 'admin', role: 'ADMIN', email: 'admin@hospital.com', title: 'System Administrator' },
-            DOCTOR: { id: 2, username: 'dr_smith', role: 'DOCTOR', email: 'smith@hospital.com', title: 'Dr. Robert Smith (Cardiology)' },
-            NURSE: { id: 4, username: 'nurse_joy', role: 'NURSE', email: 'joy@hospital.com', title: 'Nurse Joy Carter' },
-            RECEPTIONIST: { id: 5, username: 'reception_alex', role: 'RECEPTIONIST', email: 'alex@hospital.com', title: 'Alex Rivera (Reception)' },
-            LAB_STAFF: { id: 6, username: 'lab_david', role: 'LAB_STAFF', email: 'david@hospital.com', title: 'David Chen (Lab Tech)' },
-            PHARMACIST: { id: 7, username: 'pharma_emma', role: 'PHARMACIST', email: 'emma@hospital.com', title: 'Emma Watson (Pharmacist)' },
-            ACCOUNTANT: { id: 8, username: 'account_marcus', role: 'ACCOUNTANT', email: 'marcus@hospital.com', title: 'Marcus Brody (Accountant)' }
-        };
-
-        if (roleProfiles[newRole]) {
-            setUser(roleProfiles[newRole]);
-        }
-
-        try {
-            // Synchronize session cookie with backend
-            await api.post('/auth/demo-switch', { role: newRole });
-        } catch (err) {
-            // Soft fail if offline
         }
     };
 
@@ -87,7 +109,7 @@ export const AuthProvider = ({ children }) => {
                 loading,
                 login,
                 logout,
-                switchDemoRole
+                clearDatabaseUsers
             }}
         >
             {children}
@@ -102,3 +124,5 @@ export const useAuth = () => {
     }
     return context;
 };
+
+export default AuthContext;
