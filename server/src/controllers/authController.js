@@ -2,65 +2,179 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import pool from '../config/db.js';
 import { logAudit } from '../middleware/auditLogger.js';
+import { validateLoginInput } from '../validators/authValidator.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_hms_key_2026_hospital';
 
 /**
- * Login Controller:
- * Verifies credentials, generates signed JWT { id, username, role },
- * sets secure httpOnly cookie 'jwt_token', and records audit log.
+ * Centralized Role-to-Dashboard route mapping
+ */
+export const ROLE_DASHBOARDS = {
+    ADMIN: '/admin/dashboard',
+    DOCTOR: '/doctor/dashboard',
+    NURSE: '/nurse/dashboard',
+    RECEPTIONIST: '/receptionist/dashboard',
+    LAB_STAFF: '/laboratory/dashboard',
+    PHARMACIST: '/pharmacy/dashboard',
+    ACCOUNTANT: '/accountant/dashboard'
+};
+
+/**
+ * Login / Dynamic User Setup Controller:
+ * 1. If user doesn't exist: dynamically creates the user with custom password & chosen role.
+ * 2. If user exists: verifies BOTH password AND selected role against the database.
  */
 export const login = async (req, res) => {
     try {
-        const { username, password } = req.body;
-
-        if (!username || !password) {
+        const validation = validateLoginInput(req.body);
+        if (!validation.isValid) {
+            const firstError = Object.values(validation.errors)[0];
             return res.status(400).json({
                 success: false,
-                message: 'Username and password are required.'
+                message: firstError,
+                errors: validation.errors
             });
         }
 
-        // Fetch user with role name
+        const { identifier, password, role: selectedRole } = validation.cleanData;
+
+        // Fetch existing user from database
         const [users] = await pool.query(
-            `SELECT u.id, u.username, u.email, u.password_hash, u.is_active, r.name AS role
+            `SELECT u.id, u.username, u.email, u.password_hash, u.is_active, u.role_id, r.name AS role,
+                    COALESCE(d.full_name, e.full_name, u.username) AS full_name
              FROM users u
              JOIN roles r ON u.role_id = r.id
+             LEFT JOIN doctors d ON d.user_id = u.id
+             LEFT JOIN employees e ON e.user_id = u.id
              WHERE u.username = ? OR u.email = ?`,
-            [username.trim(), username.trim()]
+            [identifier, identifier]
         );
 
+        let authenticatedUser = null;
+
+        // -------------------------------------------------------------
+        // CASE 1: USER DOES NOT EXIST -> DYNAMIC FIRST-TIME REGISTRATION
+        // -------------------------------------------------------------
         if (users.length === 0) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid username or password.'
-            });
-        }
+            const assignedRole = selectedRole || 'ADMIN';
 
-        const user = users[0];
+            // Find matching role_id from database
+            const [roleRows] = await pool.query('SELECT id, name FROM roles WHERE name = ?', [assignedRole]);
+            if (roleRows.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: `Invalid role '${assignedRole}'. Must be a valid hospital role.`
+                });
+            }
 
-        if (!user.is_active) {
-            return res.status(403).json({
-                success: false,
-                message: 'Account is deactivated. Please contact the administrator.'
-            });
-        }
+            const roleId = roleRows[0].id;
+            const hashedPassword = await bcrypt.hash(password, 10);
+            const userEmail = `${identifier.toLowerCase()}@hospital.local`;
 
-        // Validate password with bcrypt
-        const isMatch = await bcrypt.compare(password, user.password_hash);
-        if (!isMatch) {
-            return res.status(401).json({
-                success: false,
-                message: 'Invalid username or password.'
-            });
+            // Insert new user into MySQL
+            const [insertResult] = await pool.query(
+                `INSERT INTO users (username, email, password_hash, role_id, is_active)
+                 VALUES (?, ?, ?, ?, TRUE)`,
+                [identifier, userEmail, hashedPassword, roleId]
+            );
+
+            const newUserId = insertResult.insertId;
+
+            // Link to doctor or employee profile if available, or create a linked clinical record
+            let fullName = identifier;
+            if (assignedRole === 'DOCTOR') {
+                fullName = `Dr. ${identifier.replace(/^(dr_?|doctor_?)/i, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
+                // Link an unassigned doctor or create a new doctor entry
+                const [unassignedDocs] = await pool.query('SELECT id FROM doctors WHERE user_id IS NULL LIMIT 1');
+                if (unassignedDocs.length > 0) {
+                    await pool.query('UPDATE doctors SET user_id = ?, full_name = ? WHERE id = ?', [newUserId, fullName, unassignedDocs[0].id]);
+                } else {
+                    await pool.query(
+                        `INSERT INTO doctors (user_id, department_id, full_name, specialization, phone)
+                         VALUES (?, 1, ?, 'Physician', '+1 555-0199')`,
+                        [newUserId, fullName]
+                    );
+                }
+            } else if (['NURSE', 'RECEPTIONIST', 'LAB_STAFF', 'PHARMACIST', 'ACCOUNTANT'].includes(assignedRole)) {
+                fullName = identifier.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const [unassignedEmp] = await pool.query('SELECT id FROM employees WHERE user_id IS NULL LIMIT 1');
+                if (unassignedEmp.length > 0) {
+                    await pool.query('UPDATE employees SET user_id = ?, full_name = ? WHERE id = ?', [newUserId, fullName, unassignedEmp[0].id]);
+                }
+            }
+
+            // Log registration event
+            await logAudit(
+                newUserId,
+                'USER_REGISTERED',
+                'users',
+                newUserId,
+                `User ${identifier} registered into database with role ${assignedRole}`,
+                req
+            );
+
+            authenticatedUser = {
+                id: newUserId,
+                username: identifier,
+                email: userEmail,
+                role: assignedRole,
+                role_id: roleId,
+                full_name: fullName,
+                is_active: true
+            };
+        } else {
+            // -------------------------------------------------------------
+            // CASE 2: USER EXISTS -> STRICT DATABASE VERIFICATION
+            // -------------------------------------------------------------
+            const existingUser = users[0];
+
+            // 1. Check account active status
+            if (!existingUser.is_active) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Your account has been deactivated. Please contact the hospital administrator.'
+                });
+            }
+
+            // 2. Verify Password against MySQL bcrypt hash
+            const isPasswordMatch = await bcrypt.compare(password, existingUser.password_hash);
+            if (!isPasswordMatch) {
+                return res.status(401).json({
+                    success: false,
+                    message: 'Incorrect password. Please enter the correct password registered for this account.'
+                });
+            }
+
+            // 3. Verify Selected Role matches registered Database Role
+            if (selectedRole && existingUser.role !== selectedRole) {
+                return res.status(403).json({
+                    success: false,
+                    message: `Role mismatch: This account is registered in the database as '${existingUser.role}', but you selected '${selectedRole}'. Please select '${existingUser.role}' to proceed.`,
+                    registeredRole: existingUser.role,
+                    selectedRole
+                });
+            }
+
+            // Log successful login
+            await logAudit(
+                existingUser.id,
+                'LOGIN_SUCCESS',
+                'users',
+                existingUser.id,
+                `User ${existingUser.username} (${existingUser.role}) verified credentials successfully`,
+                req
+            );
+
+            authenticatedUser = existingUser;
         }
 
         // Generate signed JWT
         const tokenPayload = {
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            role: user.role
+            id: authenticatedUser.id,
+            username: authenticatedUser.username,
+            email: authenticatedUser.email,
+            role: authenticatedUser.role,
+            role_id: authenticatedUser.role_id
         };
 
         const token = jwt.sign(tokenPayload, JWT_SECRET, { expiresIn: '24h' });
@@ -73,32 +187,63 @@ export const login = async (req, res) => {
             maxAge: 24 * 60 * 60 * 1000 // 24 hours
         });
 
-        // Record audit trail
-        await logAudit(user.id, 'LOGIN', 'users', user.id, 'User logged in successfully', req);
+        const dashboardRoute = ROLE_DASHBOARDS[authenticatedUser.role] || '/admin/dashboard';
 
         return res.json({
             success: true,
             message: 'Authentication successful.',
-            token, // available for authorization header clients
+            token,
             user: {
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                role: user.role
+                id: authenticatedUser.id,
+                username: authenticatedUser.username,
+                email: authenticatedUser.email,
+                role: authenticatedUser.role,
+                full_name: authenticatedUser.full_name,
+                dashboardRoute
             }
         });
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login / User Setup error:', error);
         return res.status(500).json({
             success: false,
-            message: 'An error occurred during authentication.'
+            message: 'An internal server error occurred during authentication.'
         });
     }
 };
 
 /**
- * Logout Controller:
- * Clears the httpOnly jwt_token cookie and logs audit action.
+ * Clear Users Controller:
+ * Resets user credentials from the database as requested.
+ */
+export const clearUsers = async (req, res) => {
+    try {
+        await pool.query('UPDATE doctors SET user_id = NULL');
+        await pool.query('UPDATE employees SET user_id = NULL');
+        await pool.query('UPDATE audit_logs SET user_id = NULL');
+        await pool.query('DELETE FROM users');
+        await pool.query('ALTER TABLE users AUTO_INCREMENT = 1');
+
+        res.clearCookie('jwt_token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
+
+        return res.json({
+            success: true,
+            message: 'All user credentials cleared from database successfully. You can now register fresh user accounts.'
+        });
+    } catch (error) {
+        console.error('Clear users error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to clear users from database.'
+        });
+    }
+};
+
+/**
+ * Logout Controller
  */
 export const logout = async (req, res) => {
     try {
@@ -111,32 +256,34 @@ export const logout = async (req, res) => {
         });
 
         if (userId) {
-            await logAudit(userId, 'LOGOUT', 'users', userId, 'User logged out', req);
+            await logAudit(userId, 'LOGOUT', 'users', userId, `User session closed`, req);
         }
 
         return res.json({
             success: true,
-            message: 'Logged out successfully.'
+            message: 'Session closed successfully. Logged out.'
         });
     } catch (error) {
         console.error('Logout error:', error);
         return res.status(500).json({
             success: false,
-            message: 'Error during logout.'
+            message: 'An error occurred during logout.'
         });
     }
 };
 
 /**
- * Me Controller:
- * Returns current authenticated session details from decoded token / database.
+ * GetMe Controller
  */
 export const getMe = async (req, res) => {
     try {
         const [users] = await pool.query(
-            `SELECT u.id, u.username, u.email, u.is_active, u.created_at, r.name AS role
+            `SELECT u.id, u.username, u.email, u.is_active, u.created_at, r.name AS role,
+                    COALESCE(d.full_name, e.full_name, u.username) AS full_name
              FROM users u
              JOIN roles r ON u.role_id = r.id
+             LEFT JOIN doctors d ON d.user_id = u.id
+             LEFT JOIN employees e ON e.user_id = u.id
              WHERE u.id = ?`,
             [req.user.id]
         );
@@ -144,13 +291,25 @@ export const getMe = async (req, res) => {
         if (users.length === 0) {
             return res.status(404).json({
                 success: false,
-                message: 'User session not found.'
+                message: 'User session not found in database.'
             });
         }
 
+        const user = users[0];
+        const dashboardRoute = ROLE_DASHBOARDS[user.role] || '/admin/dashboard';
+
         return res.json({
             success: true,
-            user: users[0]
+            user: {
+                id: user.id,
+                username: user.username,
+                email: user.email,
+                role: user.role,
+                full_name: user.full_name,
+                is_active: user.is_active,
+                created_at: user.created_at,
+                dashboardRoute
+            }
         });
     } catch (error) {
         console.error('GetMe error:', error);
@@ -161,59 +320,4 @@ export const getMe = async (req, res) => {
     }
 };
 
-/**
- * Demo Persona Switcher Controller:
- * Rapidly issues a session for a specified role persona (for development and review testing).
- */
-export const demoSwitch = async (req, res) => {
-    try {
-        const targetRole = (req.body.role || req.params.role || 'ADMIN').toUpperCase();
-
-        const [users] = await pool.query(
-            `SELECT u.id, u.username, u.email, r.name AS role
-             FROM users u
-             JOIN roles r ON u.role_id = r.id
-             WHERE r.name = ? AND u.is_active = 1
-             LIMIT 1`,
-            [targetRole]
-        );
-
-        if (users.length === 0) {
-            return res.status(404).json({
-                success: false,
-                message: `No active demo user found for role ${targetRole}.`
-            });
-        }
-
-        const user = users[0];
-        const token = jwt.sign(
-            { id: user.id, username: user.username, email: user.email, role: user.role },
-            JWT_SECRET,
-            { expiresIn: '24h' }
-        );
-
-        res.cookie('jwt_token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000
-        });
-
-        await logAudit(user.id, 'DEMO_SWITCH', 'users', user.id, `Switched to ${targetRole} persona`, req);
-
-        return res.json({
-            success: true,
-            message: `Switched session to role ${user.role} (${user.username})`,
-            token,
-            user
-        });
-    } catch (error) {
-        console.error('Demo switch error:', error);
-        return res.status(500).json({
-            success: false,
-            message: 'Error switching demo persona.'
-        });
-    }
-};
-
-export default { login, logout, getMe, demoSwitch };
+export default { login, clearUsers, logout, getMe, ROLE_DASHBOARDS };
