@@ -11,6 +11,7 @@ import {
 import { getBills, getBillById, createBill, recordPayment } from '../controllers/billingController.js';
 import { getStaff, createStaff, getAttendance, markAttendance, getReportsSummary, triggerBackup } from '../controllers/staffReportController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
+import { requireRoles } from '../middleware/roleMiddleware.js';
 
 const router = express.Router();
 
@@ -19,49 +20,51 @@ router.get('/ping', (req, res) => {
     res.json({ message: 'HMS API Router Active', timestamp: new Date().toISOString() });
 });
 
-// Authentication & Audit Routes
+// Authentication Endpoints (Public + me)
 router.use('/auth', authRoutes);
-router.use('/audit-logs', auditRoutes);
 
-// Patients Routes
-router.get('/patients', getPatients);
-router.get('/patients/:id', getPatientById);
-router.post('/patients', createPatient);
+// Audit Logs (ADMIN only)
+router.use('/audit-logs', verifyToken, requireRoles('ADMIN'), auditRoutes);
 
-// Appointments & Doctors Routes
-router.get('/appointments', getAppointments);
-router.post('/appointments', createAppointment);
-router.patch('/appointments/:id/status', updateAppointmentStatus);
-router.get('/doctors', getDoctors);
+// Patients Routes (ADMIN, DOCTOR, NURSE, RECEPTIONIST)
+router.get('/patients', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getPatients);
+router.get('/patients/:id', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getPatientById);
+router.post('/patients', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createPatient);
 
-// EMR & Consultations
-router.get('/emr', getMedicalRecords);
-router.post('/emr', createMedicalRecord);
+// Appointments & Doctors Routes (ADMIN, DOCTOR, RECEPTIONIST)
+router.get('/appointments', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), getAppointments);
+router.post('/appointments', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createAppointment);
+router.patch('/appointments/:id/status', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), updateAppointmentStatus);
+router.get('/doctors', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getDoctors);
 
-// Laboratory Tests
-router.get('/laboratory', getLabTests);
-router.patch('/laboratory/:id/sample', updateLabSampleStatus);
-router.patch('/laboratory/:id/result', updateLabResult);
+// EMR & Consultations (ADMIN, DOCTOR)
+router.get('/emr', verifyToken, requireRoles('ADMIN', 'DOCTOR'), getMedicalRecords);
+router.post('/emr', verifyToken, requireRoles('ADMIN', 'DOCTOR'), createMedicalRecord);
 
-// Pharmacy & Inventory
-router.get('/pharmacy', getMedicines);
-router.post('/pharmacy', addMedicine);
-router.post('/pharmacy/:id/dispense', dispenseMedicine);
+// Laboratory Tests (ADMIN, LAB_STAFF)
+router.get('/laboratory', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), getLabTests);
+router.patch('/laboratory/:id/sample', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), updateLabSampleStatus);
+router.patch('/laboratory/:id/result', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), updateLabResult);
 
-// Billing & Invoices
-router.get('/billing', getBills);
-router.get('/billing/:id', getBillById);
-router.post('/billing', createBill);
-router.post('/billing/:id/pay', recordPayment);
+// Pharmacy & Inventory (ADMIN, PHARMACIST)
+router.get('/pharmacy', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), getMedicines);
+router.post('/pharmacy', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), addMedicine);
+router.post('/pharmacy/:id/dispense', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), dispenseMedicine);
 
-// Staff & Attendance
-router.get('/staff', getStaff);
-router.post('/staff', createStaff);
-router.get('/attendance', getAttendance);
-router.post('/attendance', markAttendance);
+// Billing & Invoices (ADMIN, RECEPTIONIST, ACCOUNTANT)
+router.get('/billing', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST', 'ACCOUNTANT'), getBills);
+router.get('/billing/:id', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST', 'ACCOUNTANT'), getBillById);
+router.post('/billing', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST', 'ACCOUNTANT'), createBill);
+router.post('/billing/:id/pay', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), recordPayment);
 
-// Reports & Backups
-router.get('/reports/summary', getReportsSummary);
-router.post('/backup/trigger', triggerBackup);
+// Staff & Attendance (ADMIN, ACCOUNTANT)
+router.get('/staff', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), getStaff);
+router.post('/staff', verifyToken, requireRoles('ADMIN'), createStaff);
+router.get('/attendance', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), getAttendance);
+router.post('/attendance', verifyToken, requireRoles('ADMIN'), markAttendance);
+
+// Reports & Backups (ADMIN, ACCOUNTANT)
+router.get('/reports/summary', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), getReportsSummary);
+router.post('/backup/trigger', verifyToken, requireRoles('ADMIN'), triggerBackup);
 
 export default router;
