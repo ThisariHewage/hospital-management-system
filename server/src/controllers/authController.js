@@ -6,6 +6,10 @@ import { validateLoginInput } from '../validators/authValidator.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_jwt_hms_key_2026_hospital';
 
+// Super Admin env credentials – only account allowed to hold the ADMIN role
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
 /**
  * Centralized Role-to-Dashboard route mapping
  */
@@ -56,7 +60,15 @@ export const login = async (req, res) => {
         // CASE 1: USER DOES NOT EXIST -> DYNAMIC FIRST-TIME REGISTRATION
         // -------------------------------------------------------------
         if (users.length === 0) {
-            const assignedRole = selectedRole || 'ADMIN';
+            const assignedRole = selectedRole || 'DOCTOR';
+
+            // SECURITY: Block anyone from self-registering as ADMIN
+            if (assignedRole === 'ADMIN') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'The Admin role is restricted. Only the designated super administrator can access this role.'
+                });
+            }
 
             // Find matching role_id from database
             const [roleRows] = await pool.query('SELECT id, name FROM roles WHERE name = ?', [assignedRole]);
@@ -143,6 +155,25 @@ export const login = async (req, res) => {
                     success: false,
                     message: 'Incorrect password. Please enter the correct password registered for this account.'
                 });
+            }
+
+            // SECURITY: Super admin .env credential check
+            // If this is the admin account, the plain-text password MUST also match ADMIN_PASSWORD from .env
+            if (existingUser.role === 'ADMIN') {
+                if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Server misconfiguration: Admin credentials not set in environment.'
+                    });
+                }
+                const isAdminUser = existingUser.username === ADMIN_USERNAME;
+                const isAdminPasswordCorrect = password === ADMIN_PASSWORD;
+                if (!isAdminUser || !isAdminPasswordCorrect) {
+                    return res.status(403).json({
+                        success: false,
+                        message: 'Access denied. Admin login is restricted to the designated super administrator only.'
+                    });
+                }
             }
 
             // 3. Verify Selected Role matches registered Database Role

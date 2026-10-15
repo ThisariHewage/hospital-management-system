@@ -9,8 +9,8 @@ import {
     Pill, Receipt, ShieldCheck
 } from 'lucide-react';
 
+// ADMIN is intentionally excluded — admin logs in with username+password only (no role selection required)
 const ROLE_OPTIONS = [
-    { id: 'ADMIN', title: 'System Administrator', icon: ShieldCheck, badge: 'purple', description: 'Full system & staff governance' },
     { id: 'DOCTOR', title: 'Medical Doctor', icon: Stethoscope, badge: 'teal', description: 'Clinical consultation & EMR' },
     { id: 'NURSE', title: 'Head Nurse', icon: HeartPulse, badge: 'rose', description: 'Inpatient wards & vitals' },
     { id: 'RECEPTIONIST', title: 'Front Desk Receptionist', icon: Building2, badge: 'amber', description: 'Patient intake & bookings' },
@@ -26,7 +26,7 @@ export default function Login() {
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [selectedRole, setSelectedRole] = useState('ADMIN');
+    const [selectedRole, setSelectedRole] = useState(null);
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
@@ -55,10 +55,6 @@ export default function Login() {
             return;
         }
 
-        if (!selectedRole) {
-            setError('Please select a hospital role.');
-            return;
-        }
 
         setLoading(true);
 
@@ -141,7 +137,7 @@ export default function Login() {
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
                                     className="w-full bg-slate-950/70 border border-slate-700/80 rounded-xl pl-10 pr-3.5 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/80 focus:border-teal-500 transition"
-                                    placeholder="Enter your username (e.g. dr_smith, nurse_joy, admin)"
+                                    placeholder="Enter your username"
                                 />
                             </div>
                         </div>
@@ -180,10 +176,11 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {/* Role Selection Field */}
+                        {/* Role Selection Field — Staff only (Admin logs in without selecting a role) */}
                         <div>
                             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
                                 Select Hospital Role
+                                <span className="ml-2 text-[10px] font-normal text-slate-500 normal-case tracking-normal">(Staff only — leave unselected if you are the administrator)</span>
                             </label>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {ROLE_OPTIONS.map((item) => {
@@ -193,7 +190,7 @@ export default function Login() {
                                         <button
                                             key={item.id}
                                             type="button"
-                                            onClick={() => setSelectedRole(item.id)}
+                                            onClick={() => setSelectedRole(isSelected ? null : item.id)}
                                             className={`p-2.5 rounded-xl border text-left transition flex items-center space-x-3 cursor-pointer ${isSelected
                                                 ? 'bg-teal-500/20 border-teal-500 text-white shadow-md shadow-teal-500/10'
                                                 : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'

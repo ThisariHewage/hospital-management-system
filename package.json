@@ -8,7 +8,8 @@
     "server": "npm --prefix server run dev",
     "client": "npm --prefix client run dev",
     "dev": "concurrently -n \"SERVER,CLIENT\" -c \"cyan,magenta\" \"npm run server\" \"npm run client\"",
-    "db:init": "node server/src/utils/initDb.js"
+    "db:init": "node server/src/utils/initDb.js",
+    "db:seed-admin": "npm --prefix server run seed:admin"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
