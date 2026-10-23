@@ -56,149 +56,79 @@ export const login = async (req, res) => {
 
         let authenticatedUser = null;
 
-        // -------------------------------------------------------------
-        // CASE 1: USER DOES NOT EXIST -> DYNAMIC FIRST-TIME REGISTRATION
-        // -------------------------------------------------------------
+        // ---------------------------------------------------------------
+        // CASE 1: USER DOES NOT EXIST → Reject login (registration is separate)
+        // ---------------------------------------------------------------
         if (users.length === 0) {
-            const assignedRole = selectedRole || 'DOCTOR';
-
-            // SECURITY: Block anyone from self-registering as ADMIN
-            if (assignedRole === 'ADMIN') {
-                return res.status(403).json({
-                    success: false,
-                    message: 'The Admin role is restricted. Only the designated super administrator can access this role.'
-                });
-            }
-
-            // Find matching role_id from database
-            const [roleRows] = await pool.query('SELECT id, name FROM roles WHERE name = ?', [assignedRole]);
-            if (roleRows.length === 0) {
-                return res.status(400).json({
-                    success: false,
-                    message: `Invalid role '${assignedRole}'. Must be a valid hospital role.`
-                });
-            }
-
-            const roleId = roleRows[0].id;
-            const hashedPassword = await bcrypt.hash(password, 10);
-            const userEmail = `${identifier.toLowerCase()}@hospital.local`;
-
-            // Insert new user into MySQL (pending admin approval)
-            const [insertResult] = await pool.query(
-                `INSERT INTO users (username, email, password_hash, role_id, is_active)
-                 VALUES (?, ?, ?, ?, FALSE)`,
-                [identifier, userEmail, hashedPassword, roleId]
-            );
-
-            const newUserId = insertResult.insertId;
-
-            // Link to doctor or employee profile if available, or create a linked clinical record
-            let fullName = identifier;
-            if (assignedRole === 'DOCTOR') {
-                fullName = `Dr. ${identifier.replace(/^(dr_?|doctor_?)/i, '').replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}`;
-                // Link an unassigned doctor or create a new doctor entry
-                const [unassignedDocs] = await pool.query('SELECT id FROM doctors WHERE user_id IS NULL LIMIT 1');
-                if (unassignedDocs.length > 0) {
-                    await pool.query('UPDATE doctors SET user_id = ?, full_name = ? WHERE id = ?', [newUserId, fullName, unassignedDocs[0].id]);
-                } else {
-                    await pool.query(
-                        `INSERT INTO doctors (user_id, department_id, full_name, specialization, phone)
-                         VALUES (?, 1, ?, 'Physician', '+1 555-0199')`,
-                        [newUserId, fullName]
-                    );
-                }
-            } else if (['NURSE', 'RECEPTIONIST', 'LAB_STAFF', 'PHARMACIST', 'ACCOUNTANT'].includes(assignedRole)) {
-                fullName = identifier.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-                const [unassignedEmp] = await pool.query('SELECT id FROM employees WHERE user_id IS NULL LIMIT 1');
-                if (unassignedEmp.length > 0) {
-                    await pool.query('UPDATE employees SET user_id = ?, full_name = ? WHERE id = ?', [newUserId, fullName, unassignedEmp[0].id]);
-                }
-            }
-
-            // Log registration event
-            await logAudit(
-                newUserId,
-                'USER_REGISTERED',
-                'users',
-                newUserId,
-                `User ${identifier} registered into database with role ${assignedRole}`,
-                req
-            );
-
-            authenticatedUser = {
-                id: newUserId,
-                username: identifier,
-                email: userEmail,
-                role: assignedRole,
-                role_id: roleId,
-                full_name: fullName,
-                is_active: true
-            };
-        } else {
-            // -------------------------------------------------------------
-            // CASE 2: USER EXISTS -> STRICT DATABASE VERIFICATION
-            // -------------------------------------------------------------
-            const existingUser = users[0];
-
-            // 1. Check account active status (pending admin approval or deactivated)
-            if (!existingUser.is_active) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Your account is pending admin approval. Please wait for the hospital administrator to activate your access.',
-                    pending: true
-                });
-            }
-
-            // 2. Verify Password against MySQL bcrypt hash
-            const isPasswordMatch = await bcrypt.compare(password, existingUser.password_hash);
-            if (!isPasswordMatch) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Incorrect password. Please enter the correct password registered for this account.'
-                });
-            }
-
-            // SECURITY: Super admin .env credential check
-            // If this is the admin account, the plain-text password MUST also match ADMIN_PASSWORD from .env
-            if (existingUser.role === 'ADMIN') {
-                if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
-                    return res.status(500).json({
-                        success: false,
-                        message: 'Server misconfiguration: Admin credentials not set in environment.'
-                    });
-                }
-                const isAdminUser = existingUser.username === ADMIN_USERNAME;
-                const isAdminPasswordCorrect = password === ADMIN_PASSWORD;
-                if (!isAdminUser || !isAdminPasswordCorrect) {
-                    return res.status(403).json({
-                        success: false,
-                        message: 'Access denied. Admin login is restricted to the designated super administrator only.'
-                    });
-                }
-            }
-
-            // 3. Verify Selected Role matches registered Database Role
-            if (selectedRole && existingUser.role !== selectedRole) {
-                return res.status(403).json({
-                    success: false,
-                    message: `Role mismatch: This account is registered in the database as '${existingUser.role}', but you selected '${selectedRole}'. Please select '${existingUser.role}' to proceed.`,
-                    registeredRole: existingUser.role,
-                    selectedRole
-                });
-            }
-
-            // Log successful login
-            await logAudit(
-                existingUser.id,
-                'LOGIN_SUCCESS',
-                'users',
-                existingUser.id,
-                `User ${existingUser.username} (${existingUser.role}) verified credentials successfully`,
-                req
-            );
-
-            authenticatedUser = existingUser;
+            return res.status(401).json({
+                success: false,
+                message: 'Account not found. Please register first and wait for admin approval before signing in.'
+            });
         }
+        // -------------------------------------------------------------
+        // CASE 2: USER EXISTS -> STRICT DATABASE VERIFICATION
+        // -------------------------------------------------------------
+        const existingUser = users[0];
+
+        // 1. Check account active status (pending admin approval or deactivated)
+        if (!existingUser.is_active) {
+            return res.status(403).json({
+                success: false,
+                message: 'Your account is pending admin approval. Please wait for the hospital administrator to activate your access.',
+                pending: true
+            });
+        }
+
+        // 2. Verify Password against MySQL bcrypt hash
+        const isPasswordMatch = await bcrypt.compare(password, existingUser.password_hash);
+        if (!isPasswordMatch) {
+            return res.status(401).json({
+                success: false,
+                message: 'Incorrect password. Please enter the correct password registered for this account.'
+            });
+        }
+
+        // SECURITY: Super admin .env credential check
+        // If this is the admin account, the plain-text password MUST also match ADMIN_PASSWORD from .env
+        if (existingUser.role === 'ADMIN') {
+            if (!ADMIN_USERNAME || !ADMIN_PASSWORD) {
+                return res.status(500).json({
+                    success: false,
+                    message: 'Server misconfiguration: Admin credentials not set in environment.'
+                });
+            }
+            const isAdminUser = existingUser.username === ADMIN_USERNAME;
+            const isAdminPasswordCorrect = password === ADMIN_PASSWORD;
+            if (!isAdminUser || !isAdminPasswordCorrect) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied. Admin login is restricted to the designated super administrator only.'
+                });
+            }
+        }
+
+        // 3. Verify Selected Role matches registered Database Role (only if caller sent a role)
+        if (selectedRole && existingUser.role !== selectedRole) {
+            return res.status(403).json({
+                success: false,
+                message: `Role mismatch: This account is registered as '${existingUser.role}', but you selected '${selectedRole}'.`,
+                registeredRole: existingUser.role,
+                selectedRole
+            });
+        }
+
+        // Log successful login
+        await logAudit(
+            existingUser.id,
+            'LOGIN_SUCCESS',
+            'users',
+            existingUser.id,
+            `User ${existingUser.username} (${existingUser.role}) verified credentials successfully`,
+            req
+        );
+
+        authenticatedUser = existingUser;
+
 
         // Generate signed JWT
         const tokenPayload = {

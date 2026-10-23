@@ -5,19 +5,11 @@ import { getRoleDashboard } from '../utils/rbacConfig';
 import {
     Activity, Shield, Eye, EyeOff, Lock, User,
     AlertCircle, CheckCircle2, ArrowRight,
-    Stethoscope, HeartPulse, Building2, TestTube2,
-    Pill, Receipt, ShieldCheck
+    ShieldCheck
 } from 'lucide-react';
 
 // ADMIN is intentionally excluded — admin logs in with username+password only (no role selection required)
-const ROLE_OPTIONS = [
-    { id: 'DOCTOR', title: 'Medical Doctor', icon: Stethoscope, badge: 'teal', description: 'Clinical consultation & EMR' },
-    { id: 'NURSE', title: 'Head Nurse', icon: HeartPulse, badge: 'rose', description: 'Inpatient wards & vitals' },
-    { id: 'RECEPTIONIST', title: 'Front Desk Receptionist', icon: Building2, badge: 'amber', description: 'Patient intake & bookings' },
-    { id: 'LAB_STAFF', title: 'Laboratory Technologist', icon: TestTube2, badge: 'blue', description: 'Diagnostic tests & pathology' },
-    { id: 'PHARMACIST', title: 'Chief Pharmacist', icon: Pill, badge: 'emerald', description: 'Drug inventory & dispensary' },
-    { id: 'ACCOUNTANT', title: 'Finance & Accounts', icon: Receipt, badge: 'indigo', description: 'Invoicing & revenue reports' }
-];
+// Role options removed; login no longer requires role selection
 
 export default function Login() {
     const { login, isAuthenticated, user } = useAuth();
@@ -26,7 +18,7 @@ export default function Login() {
 
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
-    const [selectedRole, setSelectedRole] = useState(null);
+    // selectedRole state removed
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
@@ -58,7 +50,7 @@ export default function Login() {
 
         setLoading(true);
 
-        const result = await login(username.trim(), password, selectedRole);
+        const result = await login(username.trim(), password);
         setLoading(false);
 
         if (result.success) {
@@ -176,45 +168,7 @@ export default function Login() {
                             </div>
                         </div>
 
-                        {/* Role Selection Field — Staff only (Admin logs in without selecting a role) */}
-                        <div>
-                            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">
-                                Select Hospital Role
-                                <span className="ml-2 text-[10px] font-normal text-slate-500 normal-case tracking-normal">(Staff only — leave unselected if you are the administrator)</span>
-                            </label>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {ROLE_OPTIONS.map((item) => {
-                                    const Icon = item.icon;
-                                    const isSelected = selectedRole === item.id;
-                                    return (
-                                        <button
-                                            key={item.id}
-                                            type="button"
-                                            onClick={() => setSelectedRole(isSelected ? null : item.id)}
-                                            className={`p-2.5 rounded-xl border text-left transition flex items-center space-x-3 cursor-pointer ${isSelected
-                                                ? 'bg-teal-500/20 border-teal-500 text-white shadow-md shadow-teal-500/10'
-                                                : 'bg-slate-950/60 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                                                }`}
-                                        >
-                                            <div
-                                                className={`p-2 rounded-lg shrink-0 ${isSelected ? 'bg-teal-500 text-white' : 'bg-slate-900 text-slate-400'
-                                                    }`}
-                                            >
-                                                <Icon className="w-4 h-4" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="text-xs font-bold truncate leading-tight">
-                                                    {item.title}
-                                                </p>
-                                                <p className="text-[10px] text-slate-400 truncate mt-0.5 font-mono">
-                                                    {item.id}
-                                                </p>
-                                            </div>
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                        {/* Role selection removed */}
 
                         {/* Sign In / Register Button */}
                         <button
