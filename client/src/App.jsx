@@ -9,6 +9,7 @@ import Header from './components/Header';
 
 // Authentication & Public Pages
 import Login from './pages/Login';
+import LandingPage from './pages/LandingPage';
 
 // 7 Dedicated Role Dashboards
 import {
@@ -59,10 +60,24 @@ function RootDashboardRedirect() {
     return <Navigate to={destination} replace />;
 }
 
+/**
+ * Public root: show landing page for guests, redirect authenticated users to their dashboard
+ */
+function PublicLandingRoute() {
+    const { isAuthenticated, user } = useAuth();
+    if (isAuthenticated && user?.role) {
+        return <Navigate to={getRoleDashboard(user.role)} replace />;
+    }
+    return <LandingPage />;
+}
+
 export default function App() {
     return (
         <BrowserRouter>
             <Routes>
+                {/* Public Landing Page */}
+                <Route path="/" element={<PublicLandingRoute />} />
+
                 {/* Public Authentication Route */}
                 <Route path="/login" element={<Login />} />
 
