@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { ROLE_DETAILS } from '../utils/rbacConfig';
+import api from '../api/axios';
 import {
     Activity, Users, Calendar, Stethoscope, TestTube2,
     Pill, Receipt, UserCheck, ShieldCheck, BedDouble,
     AlertTriangle, CheckCircle2, Clock, ArrowRight,
-    TrendingUp, FileText, Database, HeartPulse, Building2
+    TrendingUp, FileText, Database, HeartPulse, Building2,
+    UserX, UserCheck2, Loader2, RefreshCw
 } from 'lucide-react';
 
 /**
@@ -46,6 +48,171 @@ function RoleDashboardHeader({ title, subtitle, icon: Icon, badgeColor }) {
 }
 
 /**
+ * Pending Staff Registrations Panel (Admin only)
+ */
+function PendingRegistrationsPanel() {
+    const [pendingUsers, setPendingUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [actionLoading, setActionLoading] = useState(null); // userId being actioned
+    const [error, setError] = useState('');
+
+    const fetchPending = useCallback(async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const res = await api.get('/auth/pending-users');
+            setPendingUsers(res.data.users || []);
+        } catch (err) {
+            setError('Failed to load pending registrations.');
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { fetchPending(); }, [fetchPending]);
+
+    const handleApprove = async (userId) => {
+        setActionLoading(userId);
+        try {
+            await api.put(`/auth/approve-user/${userId}`);
+            setPendingUsers(prev => prev.filter(u => u.id !== userId));
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to approve user.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleReject = async (userId) => {
+        setActionLoading(userId);
+        try {
+            await api.delete(`/auth/reject-user/${userId}`);
+            setPendingUsers(prev => prev.filter(u => u.id !== userId));
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to reject user.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const ROLE_COLORS = {
+        DOCTOR: 'bg-teal-100 text-teal-700',
+        NURSE: 'bg-rose-100 text-rose-700',
+        RECEPTIONIST: 'bg-amber-100 text-amber-700',
+        LAB_STAFF: 'bg-blue-100 text-blue-700',
+        PHARMACIST: 'bg-emerald-100 text-emerald-700',
+        ACCOUNTANT: 'bg-violet-100 text-violet-700',
+    };
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <Clock className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div>
+                        <h2 className="text-sm font-bold text-slate-800">Pending Staff Registrations</h2>
+                        <p className="text-[11px] text-slate-500">New accounts awaiting approval</p>
+                    </div>
+                    {!loading && pendingUsers.length > 0 && (
+                        <span className="ml-1 inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-500 text-white text-[10px] font-bold">
+                            {pendingUsers.length}
+                        </span>
+                    )}
+                </div>
+                <button
+                    onClick={fetchPending}
+                    title="Refresh"
+                    className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-500 hover:text-slate-800 transition cursor-pointer"
+                >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5">
+                {error && (
+                    <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl px-4 py-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 shrink-0" />
+                        {error}
+                    </div>
+                )}
+
+                {loading ? (
+                    <div className="flex items-center justify-center py-8 gap-2 text-slate-400">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        <span className="text-sm">Loading pending registrations…</span>
+                    </div>
+                ) : pendingUsers.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-slate-400">
+                        <CheckCircle2 className="w-10 h-10 text-teal-400 mb-2" />
+                        <p className="text-sm font-medium text-slate-500">No pending registrations</p>
+                        <p className="text-xs text-slate-400 mt-0.5">All staff accounts have been reviewed.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {pendingUsers.map(u => (
+                            <div
+                                key={u.id}
+                                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-slate-100 bg-slate-50 hover:bg-slate-100/70 transition"
+                            >
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <div className="w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
+                                        <span className="text-sm font-bold text-slate-600">{u.username?.[0]?.toUpperCase() || '?'}</span>
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-slate-800 truncate">@{u.username}</p>
+                                        <p className="text-[11px] text-slate-500 truncate">{u.email}</p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role] || 'bg-slate-100 text-slate-600'}`}>
+                                                {u.role}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400">
+                                                {new Date(u.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <button
+                                        id={`approve-user-${u.id}`}
+                                        onClick={() => handleApprove(u.id)}
+                                        disabled={actionLoading === u.id}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                        {actionLoading === u.id ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <UserCheck2 className="w-3.5 h-3.5" />
+                                        )}
+                                        Approve
+                                    </button>
+                                    <button
+                                        id={`reject-user-${u.id}`}
+                                        onClick={() => handleReject(u.id)}
+                                        disabled={actionLoading === u.id}
+                                        className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                                    >
+                                        {actionLoading === u.id ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <UserX className="w-3.5 h-3.5" />
+                                        )}
+                                        Reject
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
  * 1. ADMIN DASHBOARD (/admin/dashboard)
  */
 export function AdminDashboard() {
@@ -57,6 +224,9 @@ export function AdminDashboard() {
                 icon={ShieldCheck}
                 badgeColor="purple"
             />
+
+            {/* Pending Staff Registrations */}
+            <PendingRegistrationsPanel />
 
             {/* Quick Management Links */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

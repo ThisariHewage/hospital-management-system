@@ -92,7 +92,7 @@ const ROLES = [
 export default function RoleSelection() {
     const navigate = useNavigate();
     const location = useLocation();
-    const { login, isAuthenticated, user } = useAuth();
+    const { register, isAuthenticated, user } = useAuth();
 
     const [selectedRole, setSelectedRole] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -120,11 +120,11 @@ export default function RoleSelection() {
         setError('');
         setLoading(true);
 
-        const result = await login(credentials.username, credentials.password, selectedRole);
+        const result = await register(credentials.username, credentials.password, selectedRole);
         setLoading(false);
 
         if (result.success) {
-            navigate(result.dashboardRoute || getRoleDashboard(result.user.role), { replace: true });
+            navigate('/register/pending', { replace: true });
         } else {
             setError(result.message || 'Registration failed. Please try again.');
         }
@@ -197,8 +197,8 @@ export default function RoleSelection() {
                                     type="button"
                                     onClick={() => { setSelectedRole(role.id); setError(''); }}
                                     className={`relative p-4 rounded-xl border text-left transition-all duration-200 cursor-pointer group ${isSelected
-                                            ? `${role.activeBg} ${role.activeBorder} shadow-lg ${role.activeGlow} -translate-y-0.5`
-                                            : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:-translate-y-0.5 hover:bg-slate-900/80'
+                                        ? `${role.activeBg} ${role.activeBorder} shadow-lg ${role.activeGlow} -translate-y-0.5`
+                                        : 'bg-slate-950/60 border-slate-800 hover:border-slate-700 hover:-translate-y-0.5 hover:bg-slate-900/80'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">

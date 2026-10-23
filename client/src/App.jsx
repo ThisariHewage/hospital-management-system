@@ -12,6 +12,7 @@ import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
 import Register from './pages/Register';
 import RoleSelection from './pages/RoleSelection';
+import RegisterPending from './pages/RegisterPending';
 
 // 7 Dedicated Role Dashboards
 import {
@@ -84,6 +85,7 @@ export default function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/register/role" element={<RoleSelection />} />
+                <Route path="/register/pending" element={<RegisterPending />} />
 
                 {/* All Authenticated & Role-Protected Routes */}
                 <Route

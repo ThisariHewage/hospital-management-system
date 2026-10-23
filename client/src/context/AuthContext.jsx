@@ -72,6 +72,26 @@ export const AuthProvider = ({ children }) => {
     };
 
     /**
+     * Registers a new user as pending (does NOT issue JWT or set user state).
+     * Returns { success, pending, message } from the server.
+     */
+    const register = async (username, password, role) => {
+        try {
+            const response = await api.post('/auth/register', { username, password, role });
+            return {
+                success: true,
+                pending: response.data.pending,
+                message: response.data.message
+            };
+        } catch (error) {
+            return {
+                success: false,
+                message: error.response?.data?.message || 'Registration failed. Please try again.'
+            };
+        }
+    };
+
+    /**
      * Clears all users in MySQL database and resets session
      */
     const clearDatabaseUsers = async () => {
@@ -108,6 +128,7 @@ export const AuthProvider = ({ children }) => {
                 isAuthenticated: !!user,
                 loading,
                 login,
+                register,
                 logout,
                 clearDatabaseUsers
             }}
