@@ -117,6 +117,8 @@ export const AuthProvider = ({ children }) => {
             console.error('Logout error:', err);
         } finally {
             setUser(null);
+            // Navigate to landing page after logout
+            window.location.href = '/';
         }
     };
 
