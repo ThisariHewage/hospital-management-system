@@ -36,8 +36,8 @@ export default function LandingPage() {
 
             {/* ── NAVBAR ─────────────────────────────────────────────── */}
             <nav className={`fixed top-0 inset-x-0 z-50 transition-all duration-500 ${scrolled
-                    ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/80 shadow-2xl shadow-black/40'
-                    : 'bg-transparent'
+                ? 'bg-slate-950/95 backdrop-blur-xl border-b border-slate-800/80 shadow-2xl shadow-black/40'
+                : 'bg-transparent'
                 }`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-18 flex items-center justify-between">
 
@@ -55,7 +55,7 @@ export default function LandingPage() {
 
                     {/* Desktop Centre Links */}
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-                        {['Services', 'About', 'Departments', 'Contact'].map(link => (
+                        {['Services', 'About', 'Contact'].map(link => (
                             <a
                                 key={link}
                                 href={`#${link.toLowerCase()}`}
@@ -131,24 +131,7 @@ export default function LandingPage() {
                             and a patient-first philosophy — available 24 hours a day, 7 days a week.
                         </p>
 
-                        {/* CTA Buttons */}
-                        <div className="mt-8 flex flex-wrap gap-3">
-                            <button
-                                onClick={() => navigate('/login')}
-                                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-xl bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-400 hover:to-cyan-500 text-white shadow-xl shadow-teal-500/30 hover:shadow-teal-400/50 transition-all duration-200 active:scale-95 cursor-pointer"
-                            >
-                                <Shield className="w-4 h-4" />
-                                Access Patient Portal
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
-                            <button
-                                onClick={() => navigate('/register')}
-                                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-bold rounded-xl border border-white/20 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-200 active:scale-95 cursor-pointer backdrop-blur-sm"
-                            >
-                                <Users className="w-4 h-4" />
-                                Register Now
-                            </button>
-                        </div>
+
 
                         {/* Trust badges */}
                         <div className="mt-8 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-400">

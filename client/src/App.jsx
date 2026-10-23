@@ -10,6 +10,8 @@ import Header from './components/Header';
 // Authentication & Public Pages
 import Login from './pages/Login';
 import LandingPage from './pages/LandingPage';
+import Register from './pages/Register';
+import RoleSelection from './pages/RoleSelection';
 
 // 7 Dedicated Role Dashboards
 import {
@@ -78,8 +80,10 @@ export default function App() {
                 {/* Public Landing Page */}
                 <Route path="/" element={<PublicLandingRoute />} />
 
-                {/* Public Authentication Route */}
+                {/* Public Authentication Routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/register/role" element={<RoleSelection />} />
 
                 {/* All Authenticated & Role-Protected Routes */}
                 <Route
