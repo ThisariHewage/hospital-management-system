@@ -55,7 +55,7 @@ export default function LandingPage() {
 
                     {/* Desktop Centre Links */}
                     <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-                        {['Services', 'About', 'Contact'].map(link => (
+                        {['Home', 'Services', 'About', 'Contact'].map(link => (
                             <a
                                 key={link}
                                 href={`#${link.toLowerCase()}`}
@@ -88,7 +88,7 @@ export default function LandingPage() {
             </nav>
 
             {/* ── HERO SECTION ───────────────────────────────────────── */}
-            <section className="relative min-h-screen flex flex-col justify-end overflow-hidden">
+            <section id="home" className="relative min-h-screen flex flex-col justify-end overflow-hidden">
 
                 {/* Background hero image */}
                 <div className="absolute inset-0">
