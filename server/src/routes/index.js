@@ -4,7 +4,7 @@ import auditRoutes from './auditRoutes.js';
 import { getPatients, getPatientById, createPatient } from '../controllers/patientController.js';
 import { getAppointments, getDoctors, createAppointment, updateAppointmentStatus } from '../controllers/appointmentController.js';
 import {
-    getMedicalRecords, createMedicalRecord,
+    getConsultationPatients, getMedicalRecords, createMedicalRecord,
     getLabTests, updateLabSampleStatus, updateLabResult,
     getMedicines, addMedicine, dispenseMedicine
 } from '../controllers/clinicalController.js';
@@ -38,6 +38,7 @@ router.patch('/appointments/:id/status', verifyToken, requireRoles('ADMIN', 'DOC
 router.get('/doctors', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getDoctors);
 
 // EMR & Consultations (ADMIN, DOCTOR)
+router.get('/emr/consultation-patients', verifyToken, requireRoles('ADMIN', 'DOCTOR'), getConsultationPatients);
 router.get('/emr', verifyToken, requireRoles('ADMIN', 'DOCTOR'), getMedicalRecords);
 router.post('/emr', verifyToken, requireRoles('ADMIN', 'DOCTOR'), createMedicalRecord);
 

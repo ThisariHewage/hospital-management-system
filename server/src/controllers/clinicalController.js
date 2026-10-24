@@ -4,6 +4,43 @@ import { logAudit } from '../middleware/auditLogger.js';
 // ==========================================
 // EMR (Medical Records & Prescriptions)
 // ==========================================
+export const getConsultationPatients = async (req, res) => {
+    try {
+        const params = [];
+        let doctorFilter = '';
+
+        if (req.user?.role === 'DOCTOR') {
+            const [doctorRows] = await pool.query(
+                'SELECT id FROM doctors WHERE user_id = ? LIMIT 1',
+                [req.user.id]
+            );
+
+            if (doctorRows.length === 0) {
+                return res.json({ success: true, patients: [] });
+            }
+
+            doctorFilter = ' AND a.doctor_id = ?';
+            params.push(doctorRows[0].id);
+        }
+
+        const [patients] = await pool.query(`
+            SELECT p.id, p.full_name, p.patient_code, p.gender, p.blood_group,
+                   a.doctor_id, d.full_name AS doctor_name, a.appointment_date,
+                   a.time_slot, a.reason
+            FROM appointments a
+            JOIN patients p ON p.id = a.patient_id
+            JOIN doctors d ON d.id = a.doctor_id
+            WHERE a.status = 'SCHEDULED'${doctorFilter}
+            ORDER BY a.appointment_date ASC, a.time_slot ASC
+        `, params);
+
+        res.json({ success: true, patients });
+    } catch (error) {
+        console.error('getConsultationPatients error:', error);
+        res.status(500).json({ success: false, message: 'Failed to retrieve consultation patients.' });
+    }
+};
+
 export const getMedicalRecords = async (req, res) => {
     try {
         const { patient_id } = req.query;
@@ -30,16 +67,47 @@ export const getMedicalRecords = async (req, res) => {
 
 export const createMedicalRecord = async (req, res) => {
     try {
-        const { patient_id, doctor_id, symptoms, diagnosis, treatment_plan, vitals, prescriptions } = req.body;
+        const { patient_id, symptoms, diagnosis, treatment_plan, vitals, prescriptions } = req.body;
 
-        if (!patient_id || !doctor_id || !diagnosis) {
+        if (!patient_id || !diagnosis) {
             return res.status(400).json({ success: false, message: 'Patient, doctor, and diagnosis are required.' });
+        }
+
+        let doctorId;
+        if (req.user?.role === 'DOCTOR') {
+            const [doctorRows] = await pool.query(
+                'SELECT id FROM doctors WHERE user_id = ? LIMIT 1',
+                [req.user.id]
+            );
+            if (doctorRows.length === 0) {
+                return res.status(403).json({ success: false, message: 'No doctor profile is linked to this account.' });
+            }
+            doctorId = doctorRows[0].id;
+        } else {
+            const [appointmentRows] = await pool.query(
+                `SELECT doctor_id FROM appointments
+                 WHERE patient_id = ? AND status = 'SCHEDULED'
+                 ORDER BY appointment_date ASC, time_slot ASC LIMIT 1`,
+                [patient_id]
+            );
+            if (appointmentRows.length === 0) {
+                return res.status(400).json({ success: false, message: 'The patient has no scheduled consultation.' });
+            }
+            doctorId = appointmentRows[0].doctor_id;
+        }
+
+        const [appointmentRows] = await pool.query(
+            'SELECT id FROM appointments WHERE patient_id = ? AND doctor_id = ? AND status = \'SCHEDULED\' LIMIT 1',
+            [patient_id, doctorId]
+        );
+        if (appointmentRows.length === 0) {
+            return res.status(403).json({ success: false, message: 'This patient is not assigned to your scheduled consultations.' });
         }
 
         const [recResult] = await pool.query(
             `INSERT INTO medical_records (patient_id, doctor_id, visit_date, symptoms, diagnosis, treatment_plan, notes)
              VALUES (?, ?, NOW(), ?, ?, ?, ?)`,
-            [patient_id, doctor_id, symptoms || '', diagnosis, treatment_plan || '', JSON.stringify({ vitals, prescriptions })]
+            [patient_id, doctorId, symptoms || '', diagnosis, treatment_plan || '', JSON.stringify({ vitals, prescriptions })]
         );
 
         const recordId = recResult.insertId;
@@ -49,7 +117,7 @@ export const createMedicalRecord = async (req, res) => {
             const [prescResult] = await pool.query(
                 `INSERT INTO prescriptions (medical_record_id, patient_id, doctor_id, status)
                  VALUES (?, ?, ?, 'PENDING')`,
-                [recordId, patient_id, doctor_id]
+                [recordId, patient_id, doctorId]
             );
 
             for (const item of prescriptions) {
@@ -186,6 +254,7 @@ export const dispenseMedicine = async (req, res) => {
 };
 
 export default {
+    getConsultationPatients,
     getMedicalRecords,
     createMedicalRecord,
     getLabTests,

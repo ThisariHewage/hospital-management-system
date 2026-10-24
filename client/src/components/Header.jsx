@@ -14,9 +14,6 @@ export default function Header() {
                     <span className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
                     MediCore Connected
                 </span>
-                <span className="hidden sm:inline-block text-xs text-slate-500">
-                    Database: <code className="bg-slate-100 px-1 py-0.5 rounded text-teal-700 font-mono">hospital_db</code>
-                </span>
             </div>
 
             <div className="flex items-center space-x-3 sm:space-x-4">

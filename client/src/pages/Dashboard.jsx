@@ -18,7 +18,7 @@ export default function Dashboard() {
                     <span className="text-xs uppercase tracking-widest text-teal-300 font-bold">MediCore Operational Console</span>
                     <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mt-1">Welcome back, {user?.title || user?.username}!</h2>
                     <p className="text-sm text-teal-100/80 mt-1 max-w-xl">
-                        Integrated Clinical, Administrative & Financial Workspace. Database <span className="font-mono text-teal-300 font-semibold">hospital_db</span> connected with real-time RBAC session.
+                        Integrated Clinical, Administrative & Financial Workspace with a real-time RBAC session.
                     </p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">

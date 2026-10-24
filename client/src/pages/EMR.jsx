@@ -1,13 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import { Stethoscope, User, HeartPulse, Pill, Plus, Trash2, CheckCircle2, History, AlertCircle } from 'lucide-react';
-
-const SAMPLE_PATIENTS = [
-    { id: 1, full_name: 'James Wilson', patient_code: 'PAT-2026-0001', age: 41, gender: 'Male', blood_group: 'O+' },
-    { id: 2, full_name: 'Eleanor Rigby', patient_code: 'PAT-2026-0002', age: 34, gender: 'Female', blood_group: 'A+' },
-    { id: 3, full_name: 'Liam Vance', patient_code: 'PAT-2026-0003', age: 11, gender: 'Male', blood_group: 'B-' },
-    { id: 4, full_name: 'Sophia Martinez', patient_code: 'PAT-2026-0004', age: 48, gender: 'Female', blood_group: 'AB+' }
-];
 
 const AVAILABLE_MEDS = [
     { id: 1, name: 'Amoxicillin 500mg', category: 'Antibiotics' },
@@ -19,8 +13,9 @@ const AVAILABLE_MEDS = [
 ];
 
 export default function EMR() {
-    const [patients, setPatients] = useState(SAMPLE_PATIENTS);
-    const [selectedPatientId, setSelectedPatientId] = useState(1);
+    const { role } = useAuth();
+    const [patients, setPatients] = useState([]);
+    const [selectedPatientId, setSelectedPatientId] = useState('');
     const [symptoms, setSymptoms] = useState('Mild palpitations after exertion, slight dyspnea');
     const [diagnosis, setDiagnosis] = useState('Stage 1 Hypertension • Early Cardiovascular Evaluation');
     const [treatmentPlan, setTreatmentPlan] = useState('Low sodium diet, moderate cardio 30 min/day, follow up in 3 weeks');
@@ -45,16 +40,18 @@ export default function EMR() {
     useEffect(() => {
         const fetchPatients = async () => {
             try {
-                const res = await api.get('/patients');
-                if (res.data?.patients?.length > 0) setPatients(res.data.patients);
+                const res = await api.get('/emr/consultation-patients');
+                setPatients(res.data?.patients || []);
+                setSelectedPatientId(res.data?.patients?.[0]?.id?.toString() || '');
             } catch (e) {
-                // fallback
+                setPatients([]);
+                setSelectedPatientId('');
             }
         };
         fetchPatients();
     }, []);
 
-    const selectedPatient = patients.find(p => p.id === Number(selectedPatientId)) || patients[0];
+    const selectedPatient = patients.find(p => p.id === Number(selectedPatientId));
 
     const addPrescriptionItem = () => {
         const newItem = {
@@ -79,7 +76,6 @@ export default function EMR() {
         try {
             await api.post('/emr', {
                 patient_id: selectedPatientId,
-                doctor_id: 1,
                 symptoms,
                 diagnosis,
                 treatment_plan: treatmentPlan,
@@ -122,13 +118,19 @@ export default function EMR() {
                             value={selectedPatientId}
                             onChange={(e) => setSelectedPatientId(e.target.value)}
                             className="text-sm font-semibold text-slate-800 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-teal-500"
+                            disabled={patients.length === 0}
                         >
+                            {patients.length === 0 && <option value="">No scheduled patients assigned</option>}
                             {patients.map(p => (
                                 <option key={p.id} value={p.id}>{p.full_name} ({p.patient_code})</option>
                             ))}
                         </select>
                     </div>
                 </div>
+
+                {role === 'DOCTOR' && patients.length === 0 && (
+                    <p className="text-xs text-slate-500">You have no scheduled consultations.</p>
+                )}
 
                 {selectedPatient && (
                     <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -334,7 +336,7 @@ export default function EMR() {
                 <div className="flex justify-end space-x-4">
                     <button
                         type="submit"
-                        disabled={loading}
+                        disabled={loading || !selectedPatient}
                         className="bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 text-white font-semibold px-6 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
                     >
                         {loading ? 'Saving...' : 'Finalize & Save Consultation'}
