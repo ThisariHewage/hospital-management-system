@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Users, Search, Plus, Filter, Phone, Mail, Heart, Calendar, FileText, X } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Users, Search, Plus, Filter, Phone, Mail, Heart, Calendar, FileText, X, Info } from 'lucide-react';
 
 const INITIAL_PATIENTS = [
     { id: 1, patient_code: 'PAT-2026-0001', full_name: 'James Wilson', dob: '1985-04-12', gender: 'Male', phone: '+1 555-1001', email: 'jwilson@email.com', blood_group: 'O+', emergency_contact: 'Mary Wilson (+1 555-1002)' },
@@ -9,8 +10,19 @@ const INITIAL_PATIENTS = [
     { id: 4, patient_code: 'PAT-2026-0004', full_name: 'Sophia Martinez', dob: '1978-11-03', gender: 'Female', phone: '+1 555-1007', email: 'smartinez@email.com', blood_group: 'AB+', emergency_contact: 'Carlos Martinez (+1 555-1008)' }
 ];
 
+// Fallback appointment data to map doctors → patients
+const INITIAL_APPOINTMENTS = [
+    { patient_code: 'PAT-2026-0001', doctor_name: 'Dr. Robert Smith' },
+    { patient_code: 'PAT-2026-0002', doctor_name: 'Dr. Sarah Jenkins' },
+    { patient_code: 'PAT-2026-0003', doctor_name: 'Dr. Sarah Jenkins' },
+    { patient_code: 'PAT-2026-0004', doctor_name: 'Dr. Michael Chang' },
+];
+
 export default function Patients() {
+    const { user, role } = useAuth();
+    const isDoctor = role === 'DOCTOR';
     const [patients, setPatients] = useState(INITIAL_PATIENTS);
+    const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
     const [search, setSearch] = useState('');
     const [bloodGroup, setBloodGroup] = useState('');
     const [isRegisterOpen, setIsRegisterOpen] = useState(false);
@@ -37,6 +49,15 @@ export default function Patients() {
             }
         } catch (e) {
             console.log('Using local patient state fallback');
+        }
+        // Also try to fetch appointments for doctor-scoped filtering
+        try {
+            const aptRes = await api.get('/appointments');
+            if (aptRes.data?.appointments?.length > 0) {
+                setAppointments(aptRes.data.appointments);
+            }
+        } catch (e) {
+            // keep fallback appointment data
         }
     };
 
@@ -77,7 +98,24 @@ export default function Patients() {
         }
     };
 
+    // Determine which patient codes are relevant to the logged-in doctor
+    const doctorPatientCodes = isDoctor
+        ? [...new Set(
+            appointments
+                .filter(a => {
+                    const doctorFullName = user?.full_name || '';
+                    return a.doctor_name?.toLowerCase().includes(doctorFullName.toLowerCase())
+                        || doctorFullName.toLowerCase().includes(a.doctor_name?.replace('Dr. ', '').toLowerCase() || '');
+                })
+                .map(a => a.patient_code)
+        )]
+        : null;
+
     const filteredPatients = patients.filter(p => {
+        // Doctor role-based filter: only show their assigned patients
+        if (isDoctor && doctorPatientCodes && doctorPatientCodes.length > 0) {
+            if (!doctorPatientCodes.includes(p.patient_code)) return false;
+        }
         const matchesSearch =
             p.full_name?.toLowerCase().includes(search.toLowerCase()) ||
             p.patient_code?.toLowerCase().includes(search.toLowerCase()) ||
@@ -91,17 +129,28 @@ export default function Patients() {
             {/* Header & Actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Patient Directory</h1>
-                    <p className="text-sm text-slate-500">Manage electronic patient profiles, clinical history and admissions</p>
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+                        {isDoctor ? 'My Patients' : 'Patient Directory'}
+                    </h1>
+                    <p className="text-sm text-slate-500">
+                        {isDoctor
+                            ? `Patients assigned to your care, ${user?.full_name || 'Doctor'}`
+                            : 'Manage electronic patient profiles, clinical history and admissions'}
+                    </p>
                 </div>
-                <button
-                    onClick={() => setIsRegisterOpen(true)}
-                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-medium px-4 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>Register New Patient</span>
-                </button>
+                {!isDoctor && (
+                    <button
+                        onClick={() => setIsRegisterOpen(true)}
+                        className="inline-flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 hover:to-teal-600 text-white font-medium px-4 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Register New Patient</span>
+                    </button>
+                )}
             </div>
+
+
+
 
             {/* Search & Filters */}
             <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 flex flex-col sm:flex-row gap-3">

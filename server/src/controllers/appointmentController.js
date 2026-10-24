@@ -3,7 +3,20 @@ import { logAudit } from '../middleware/auditLogger.js';
 
 export const getAppointments = async (req, res) => {
     try {
-        const { doctor_id, date, status } = req.query;
+        let { doctor_id, date, status } = req.query;
+
+        // If the logged-in user is a DOCTOR, auto-scope to their own appointments
+        if (req.user?.role === 'DOCTOR') {
+            const [doctorRows] = await pool.query(
+                'SELECT id FROM doctors WHERE user_id = ? LIMIT 1',
+                [req.user.id]
+            );
+            if (doctorRows.length === 0) {
+                return res.json({ success: true, count: 0, appointments: [] });
+            }
+            doctor_id = doctorRows[0].id; // override any client-supplied value
+        }
+
         let query = `
             SELECT a.*, p.full_name AS patient_name, p.patient_code, p.phone AS patient_phone,
                    d.full_name AS doctor_name, dep.name AS department_name
@@ -36,6 +49,7 @@ export const getAppointments = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to retrieve appointments.' });
     }
 };
+
 
 export const getDoctors = async (req, res) => {
     try {

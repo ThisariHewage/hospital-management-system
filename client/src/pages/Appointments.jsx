@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { useAuth } from '../context/AuthContext';
 import { Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Plus, Filter, Search, X } from 'lucide-react';
 
 const INITIAL_APPOINTMENTS = [
@@ -15,6 +16,8 @@ const TIME_SLOTS = [
 ];
 
 export default function Appointments() {
+    const { user, role } = useAuth();
+    const isDoctor = role === 'DOCTOR';
     const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
     const [statusFilter, setStatusFilter] = useState('');
     const [search, setSearch] = useState('');
@@ -115,16 +118,24 @@ export default function Appointments() {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Appointment Scheduling</h1>
-                    <p className="text-sm text-slate-500">Manage patient consultations, doctor schedules, and clinical queue</p>
+                    <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+                        {isDoctor ? 'My Appointments' : 'Appointment Scheduling'}
+                    </h1>
+                    <p className="text-sm text-slate-500">
+                        {isDoctor
+                            ? `Showing appointments assigned to you, ${user?.full_name || 'Doctor'}`
+                            : 'Manage patient consultations, doctor schedules, and clinical queue'}
+                    </p>
                 </div>
-                <button
-                    onClick={() => setIsBookingOpen(true)}
-                    className="inline-flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
-                >
-                    <Plus className="w-4 h-4" />
-                    <span>Book Appointment</span>
-                </button>
+                {!isDoctor && (
+                    <button
+                        onClick={() => setIsBookingOpen(true)}
+                        className="inline-flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
+                    >
+                        <Plus className="w-4 h-4" />
+                        <span>Book Appointment</span>
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -167,10 +178,10 @@ export default function Appointments() {
                                     {apt.appointment_code}
                                 </span>
                                 <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${apt.status === 'COMPLETED'
-                                        ? 'bg-emerald-100 text-emerald-800'
-                                        : apt.status === 'CANCELLED'
-                                            ? 'bg-rose-100 text-rose-800'
-                                            : 'bg-amber-100 text-amber-800'
+                                    ? 'bg-emerald-100 text-emerald-800'
+                                    : apt.status === 'CANCELLED'
+                                        ? 'bg-rose-100 text-rose-800'
+                                        : 'bg-amber-100 text-amber-800'
                                     }`}>
                                     {apt.status}
                                 </span>
