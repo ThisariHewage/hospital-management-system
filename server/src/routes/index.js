@@ -10,6 +10,7 @@ import {
 } from '../controllers/clinicalController.js';
 import { getBills, getBillById, createBill, recordPayment } from '../controllers/billingController.js';
 import { getStaff, createStaff, getAttendance, markAttendance, getReportsSummary, triggerBackup } from '../controllers/staffReportController.js';
+import { getAdmissions, createAdmission, recordVitals, dischargeAdmission } from '../controllers/admissionController.js';
 import { verifyToken } from '../middleware/authMiddleware.js';
 import { requireRoles } from '../middleware/roleMiddleware.js';
 
@@ -36,6 +37,12 @@ router.get('/appointments', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPT
 router.post('/appointments', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createAppointment);
 router.patch('/appointments/:id/status', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), updateAppointmentStatus);
 router.get('/doctors', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getDoctors);
+
+// Admissions & inpatient vital signs
+router.get('/admissions', verifyToken, requireRoles('ADMIN', 'NURSE', 'DOCTOR'), getAdmissions);
+router.post('/admissions', verifyToken, requireRoles('ADMIN', 'NURSE'), createAdmission);
+router.post('/admissions/:id/vitals', verifyToken, requireRoles('ADMIN', 'NURSE'), recordVitals);
+router.patch('/admissions/:id/discharge', verifyToken, requireRoles('ADMIN', 'NURSE'), dischargeAdmission);
 
 // EMR & Consultations (ADMIN, DOCTOR)
 router.get('/emr/consultation-patients', verifyToken, requireRoles('ADMIN', 'DOCTOR'), getConsultationPatients);

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     BedDouble, HeartPulse, CheckCircle2, X, Info,
     Thermometer, Droplets, Activity, Clock, Building2,
-    CalendarDays, DollarSign, User, AlertCircle
+    CalendarDays, DollarSign, User, AlertCircle, Plus
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../api/axios';
@@ -41,6 +41,12 @@ const INITIAL_APPOINTMENTS = [
     { patient_code: 'PAT-2026-0004', doctor_name: 'Dr. Michael Chang' },
 ];
 
+const DEPARTMENTS = [
+    { id: 1, name: 'Cardiology' }, { id: 2, name: 'Pediatrics' },
+    { id: 3, name: 'Neurology' }, { id: 4, name: 'Orthopedics' },
+    { id: 5, name: 'General Medicine' }
+];
+
 const ROOM_COLORS = {
     'ICU': { bg: 'bg-rose-50', border: 'border-rose-200', text: 'text-rose-700', badge: 'bg-rose-100 text-rose-700' },
     'General Ward': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', badge: 'bg-blue-100 text-blue-700' },
@@ -61,6 +67,7 @@ function VitalPill({ icon: Icon, label, value, color }) {
 export default function Admissions() {
     const { user, role } = useAuth();
     const isDoctor = role === 'DOCTOR';
+    const canManageAdmissions = ['ADMIN', 'NURSE'].includes(role);
 
     const [admissions, setAdmissions] = useState(INITIAL_ADMISSIONS);
     const [appointments, setAppointments] = useState(INITIAL_APPOINTMENTS);
@@ -68,6 +75,10 @@ export default function Admissions() {
     const [vitalsModal, setVitalsModal] = useState(false);
     const [vitalsForm, setVitalsForm] = useState({ bp: '', o2: '', temp: '', pulse: '' });
     const [statusFilter, setStatusFilter] = useState('ALL');
+    const [patients, setPatients] = useState([]);
+    const [isAdmissionOpen, setIsAdmissionOpen] = useState(false);
+    const [admissionForm, setAdmissionForm] = useState({ patient_id: '', department_id: '1', bed_number: '', room_type: 'General', daily_rate: '100', diagnosis: '' });
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -79,9 +90,15 @@ export default function Admissions() {
                 const aptRes = await api.get('/appointments');
                 if (aptRes.data?.appointments?.length > 0) setAppointments(aptRes.data.appointments);
             } catch (e) { /* keep fallback */ }
+            if (canManageAdmissions) {
+                try {
+                    const patientsRes = await api.get('/patients');
+                    setPatients(patientsRes.data?.patients || []);
+                } catch (e) { /* admission form remains unavailable without patients */ }
+            }
         };
         fetchData();
-    }, []);
+    }, [canManageAdmissions]);
 
     const doctorPatientCodes = isDoctor
         ? new Set(
@@ -119,18 +136,36 @@ export default function Admissions() {
         setVitalsModal(true);
     };
 
-    const handleSaveVitals = (e) => {
-        e.preventDefault();
-        setAdmissions(admissions.map(a =>
-            a.id === selectedAdm.id
-                ? { ...a, ...vitalsForm, vitals_last_checked: 'Just now' }
-                : a
-        ));
-        setVitalsModal(false);
+    const refreshAdmissions = async () => {
+        const res = await api.get('/admissions');
+        setAdmissions(res.data?.admissions || []);
     };
 
-    const handleDischarge = (id) => {
-        setAdmissions(admissions.map(a => a.id === id ? { ...a, status: 'DISCHARGED' } : a));
+    const handleSaveVitals = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await api.post(`/admissions/${selectedAdm.id}/vitals`, vitalsForm);
+            await refreshAdmissions();
+            setVitalsModal(false);
+        } finally { setSaving(false); }
+    };
+
+    const handleDischarge = async (id) => {
+        if (!window.confirm('Discharge this patient?')) return;
+        await api.patch(`/admissions/${id}/discharge`);
+        await refreshAdmissions();
+    };
+
+    const handleCreateAdmission = async (e) => {
+        e.preventDefault();
+        setSaving(true);
+        try {
+            await api.post('/admissions', admissionForm);
+            await refreshAdmissions();
+            setIsAdmissionOpen(false);
+            setAdmissionForm({ patient_id: '', department_id: '1', bed_number: '', room_type: 'General', daily_rate: '100', diagnosis: '' });
+        } finally { setSaving(false); }
     };
 
     return (
@@ -151,6 +186,11 @@ export default function Admissions() {
 
                 {/* Stat chips */}
                 <div className="flex flex-wrap gap-2 text-xs font-semibold shrink-0">
+                    {canManageAdmissions && (
+                        <button onClick={() => setIsAdmissionOpen(true)} className="inline-flex items-center gap-1.5 bg-teal-600 text-white px-3 py-2 rounded-xl hover:bg-teal-700">
+                            <Plus className="w-3.5 h-3.5" /> New Admission
+                        </button>
+                    )}
                     <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 px-3 py-2 rounded-xl">
                         <BedDouble className="w-3.5 h-3.5" />
                         Available Beds: <span className="font-black">{availableBeds}</span>
@@ -276,7 +316,7 @@ export default function Admissions() {
                                     </div>
 
                                     {/* ── Action Buttons ── */}
-                                    {isAdmitted && (
+                                    {isAdmitted && canManageAdmissions && (
                                         <div className="flex gap-2 pt-1 border-t border-slate-100 mt-auto">
                                             <button
                                                 onClick={() => handleOpenVitals(adm)}
@@ -285,15 +325,9 @@ export default function Admissions() {
                                                 <HeartPulse className="w-3.5 h-3.5" />
                                                 Record Vitals
                                             </button>
-                                            {!isDoctor && (
-                                                <button
-                                                    onClick={() => handleDischarge(adm.id)}
-                                                    className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 px-3 py-2 rounded-xl transition"
-                                                >
-                                                    <CheckCircle2 className="w-3.5 h-3.5" />
-                                                    Discharge
-                                                </button>
-                                            )}
+                                            <button onClick={() => handleDischarge(adm.id)} className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 active:bg-slate-300 px-3 py-2 rounded-xl transition">
+                                                <CheckCircle2 className="w-3.5 h-3.5" /> Discharge
+                                            </button>
                                         </div>
                                     )}
                                 </div>
@@ -354,12 +388,28 @@ export default function Admissions() {
                                     Cancel
                                 </button>
                                 <button
-                                    type="submit"
+                                    type="submit" disabled={saving}
                                     className="flex-1 px-4 py-2 text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-sm transition"
                                 >
-                                    Save Vitals
+                                    {saving ? 'Saving...' : 'Save Vitals'}
                                 </button>
                             </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isAdmissionOpen && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
+                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-slate-800">New Admission</h3><button onClick={() => setIsAdmissionOpen(false)}><X className="w-5 h-5" /></button></div>
+                        <form onSubmit={handleCreateAdmission} className="space-y-3">
+                            <select required value={admissionForm.patient_id} onChange={e => setAdmissionForm({ ...admissionForm, patient_id: e.target.value })} className="w-full border rounded-xl p-2 text-sm"><option value="">Select patient</option>{patients.map(p => <option key={p.id} value={p.id}>{p.full_name} ({p.patient_code})</option>)}</select>
+                            <select value={admissionForm.department_id} onChange={e => setAdmissionForm({ ...admissionForm, department_id: e.target.value })} className="w-full border rounded-xl p-2 text-sm">{DEPARTMENTS.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+                            <div className="grid grid-cols-2 gap-3"><input required placeholder="Bed number" value={admissionForm.bed_number} onChange={e => setAdmissionForm({ ...admissionForm, bed_number: e.target.value })} className="border rounded-xl p-2 text-sm" /><select value={admissionForm.room_type} onChange={e => setAdmissionForm({ ...admissionForm, room_type: e.target.value })} className="border rounded-xl p-2 text-sm">{['General', 'Semi-Private', 'Private', 'ICU'].map(type => <option key={type}>{type}</option>)}</select></div>
+                            <input type="number" min="0" step="0.01" placeholder="Daily rate" value={admissionForm.daily_rate} onChange={e => setAdmissionForm({ ...admissionForm, daily_rate: e.target.value })} className="w-full border rounded-xl p-2 text-sm" />
+                            <textarea placeholder="Admission diagnosis / notes" value={admissionForm.diagnosis} onChange={e => setAdmissionForm({ ...admissionForm, diagnosis: e.target.value })} className="w-full border rounded-xl p-2 text-sm" rows="2" />
+                            <button disabled={saving || patients.length === 0} className="w-full bg-teal-600 text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-50">{saving ? 'Creating...' : 'Create Admission'}</button>
                         </form>
                     </div>
                 </div>

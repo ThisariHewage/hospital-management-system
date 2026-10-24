@@ -111,6 +111,19 @@ CREATE TABLE IF NOT EXISTS admissions (
     FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS inpatient_vitals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admission_id INT NOT NULL,
+    recorded_by INT NOT NULL,
+    bp VARCHAR(30) NULL,
+    o2 VARCHAR(30) NULL,
+    temp VARCHAR(30) NULL,
+    pulse VARCHAR(30) NULL,
+    recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admission_id) REFERENCES admissions(id) ON DELETE CASCADE,
+    FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 -- 9. Electronic Medical Records (EMR) Table
 CREATE TABLE IF NOT EXISTS medical_records (
     id INT AUTO_INCREMENT PRIMARY KEY,
