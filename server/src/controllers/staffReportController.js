@@ -44,7 +44,7 @@ export const getAttendance = async (req, res) => {
     try {
         const [records] = await pool.query(`
             SELECT a.*, e.full_name, e.employee_code, e.role_title
-            FROM attendance a
+            FROM attendances a
             JOIN employees e ON a.employee_id = e.id
             WHERE a.date = CURDATE()
             ORDER BY a.id DESC
@@ -61,21 +61,21 @@ export const markAttendance = async (req, res) => {
         const { employee_id, status = 'PRESENT' } = req.body;
 
         const [existing] = await pool.query(
-            'SELECT * FROM attendance WHERE employee_id = ? AND date = CURDATE()',
+            'SELECT * FROM attendances WHERE employee_id = ? AND date = CURDATE()',
             [employee_id]
         );
 
         if (existing.length > 0) {
-            // Update clock out
+            // Update today's attendance status and checkout time
             await pool.query(
-                'UPDATE attendance SET clock_out = CURTIME(), status = ? WHERE id = ?',
+                'UPDATE attendances SET check_out = CURTIME(), status = ? WHERE id = ?',
                 [status, existing[0].id]
             );
             return res.json({ success: true, message: 'Clock-out recorded successfully.' });
         } else {
-            // Clock in
+            // Create today's attendance record
             await pool.query(
-                `INSERT INTO attendance (employee_id, date, status, clock_in)
+                `INSERT INTO attendances (employee_id, date, status, check_in)
                  VALUES (?, CURDATE(), ?, CURTIME())`,
                 [employee_id, status]
             );
@@ -100,6 +100,11 @@ export const getReportsSummary = async (req, res) => {
         const [lowStockMeds] = await pool.query('SELECT COUNT(*) AS count FROM medicines WHERE stock_quantity <= min_stock_alert');
         const [admissionsCount] = await pool.query('SELECT COUNT(*) AS count FROM admissions WHERE status = "ADMITTED"');
         const [recentBills] = await pool.query('SELECT invoice_number, total_amount, paid_amount, status, created_at FROM bills ORDER BY id DESC LIMIT 10');
+        const [revenueBreakdown] = await pool.query(`
+            SELECT DATE(created_at) AS date, 'Billing' AS category, COUNT(*) AS invoices_count,
+                   COALESCE(SUM(total_amount), 0) AS billed, COALESCE(SUM(paid_amount), 0) AS collected
+            FROM bills GROUP BY DATE(created_at) ORDER BY date DESC LIMIT 31`);
+        const [invoiceCount] = await pool.query('SELECT COUNT(*) AS count FROM bills');
 
         res.json({
             success: true,
@@ -111,9 +116,11 @@ export const getReportsSummary = async (req, res) => {
                 totalMedicines: medicineCount[0].total_items,
                 medicineStockValue: parseFloat(medicineCount[0].stock_value),
                 lowStockCount: lowStockMeds[0].count,
-                activeAdmissions: admissionsCount[0].count
+                activeAdmissions: admissionsCount[0].count,
+                invoiceCount: invoiceCount[0].count
             },
-            recentBills
+            recentBills,
+            revenueBreakdown
         });
     } catch (error) {
         console.error('getReportsSummary error:', error);

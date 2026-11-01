@@ -40,9 +40,9 @@ export default function AuditLogs() {
             });
         } catch (e) {
             setBackupStatus({
-                success: true,
-                message: 'Database backup snapshot created in database/backups/',
-                filename: `backup_snapshot_${new Date().toISOString().split('T')[0]}.json`
+                success: false,
+                message: e.response?.data?.message || 'Database backup could not be created.',
+                filename: ''
             });
         } finally {
             setBackingUp(false);
@@ -73,11 +73,11 @@ export default function AuditLogs() {
             </div>
 
             {backupStatus && (
-                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center space-x-2">
+            <div className={`${backupStatus.success ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'} border px-4 py-3 rounded-xl text-sm font-semibold flex items-center space-x-2`}>
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     <div>
                         <p>{backupStatus.message}</p>
-                        <p className="text-xs text-emerald-600 font-mono mt-0.5">Saved as: {backupStatus.filename}</p>
+                        {backupStatus.filename && <p className="text-xs text-emerald-600 font-mono mt-0.5">Saved as: {backupStatus.filename}</p>}
                     </div>
                 </div>
             )}

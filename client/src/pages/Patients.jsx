@@ -72,22 +72,10 @@ export default function Patients() {
             const res = await api.post('/patients', formData);
             if (res.data?.success) {
                 fetchPatients();
-            } else {
-                // local fallback add
-                const newP = {
-                    id: Date.now(),
-                    patient_code: `PAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-                    ...formData
-                };
-                setPatients([newP, ...patients]);
             }
         } catch (err) {
-            const newP = {
-                id: Date.now(),
-                patient_code: `PAT-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
-                ...formData
-            };
-            setPatients([newP, ...patients]);
+            alert(err.response?.data?.message || 'Unable to register patient. Please try again.');
+            return;
         } finally {
             setLoading(false);
             setIsRegisterOpen(false);

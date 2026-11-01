@@ -35,6 +35,7 @@ export default function EMR() {
     ]);
 
     const [savedSuccess, setSavedSuccess] = useState(false);
+    const [saveError, setSaveError] = useState('');
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
@@ -73,6 +74,7 @@ export default function EMR() {
     const handleSaveConsultation = async (e) => {
         e.preventDefault();
         setLoading(true);
+        setSaveError('');
         try {
             await api.post('/emr', {
                 patient_id: selectedPatientId,
@@ -85,8 +87,7 @@ export default function EMR() {
             setSavedSuccess(true);
             setTimeout(() => setSavedSuccess(false), 4000);
         } catch (err) {
-            setSavedSuccess(true);
-            setTimeout(() => setSavedSuccess(false), 4000);
+            setSaveError(err.response?.data?.message || 'Unable to save the consultation. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -131,6 +132,7 @@ export default function EMR() {
                 {role === 'DOCTOR' && patients.length === 0 && (
                     <p className="text-xs text-slate-500">You have no scheduled consultations.</p>
                 )}
+                {saveError && <p className="text-xs font-semibold text-rose-600">{saveError}</p>}
 
                 {selectedPatient && (
                     <div className="flex flex-wrap items-center gap-3 text-xs">

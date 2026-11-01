@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../api/axios';
 import {
     Users, Calendar, Receipt, AlertTriangle, Activity,
     Clock, Shield, ArrowUpRight, CheckCircle2, Stethoscope,
@@ -9,6 +10,11 @@ import {
 
 export default function Dashboard() {
     const { user, role } = useAuth();
+    const [summary, setSummary] = useState(null);
+
+    useEffect(() => {
+        api.get('/reports/summary').then(res => setSummary(res.data?.summary || null)).catch(() => setSummary(null));
+    }, []);
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto">
@@ -101,7 +107,7 @@ export default function Dashboard() {
                             <Users className="w-5 h-5" />
                         </div>
                     </div>
-                    <div className="text-3xl font-extrabold text-slate-900">1,248</div>
+                    <div className="text-3xl font-extrabold text-slate-900">{summary?.totalPatients ?? '—'}</div>
                     <div className="flex items-center text-xs text-emerald-600 mt-2 font-medium">
                         <span className="mr-1">↑ 12%</span> vs last month
                     </div>
@@ -114,7 +120,7 @@ export default function Dashboard() {
                             <Calendar className="w-5 h-5" />
                         </div>
                     </div>
-                    <div className="text-3xl font-extrabold text-slate-900">42</div>
+                    <div className="text-3xl font-extrabold text-slate-900">{summary?.todayAppointments ?? '—'}</div>
                     <div className="flex items-center text-xs text-blue-600 mt-2 font-medium">
                         <span className="mr-1">8 Scheduled</span> • 4 Completed
                     </div>
@@ -127,7 +133,7 @@ export default function Dashboard() {
                             <Receipt className="w-5 h-5" />
                         </div>
                     </div>
-                    <div className="text-3xl font-extrabold text-slate-900">$58,420</div>
+                    <div className="text-3xl font-extrabold text-slate-900">{summary ? `$${Number(summary.totalRevenue).toLocaleString()}` : '—'}</div>
                     <div className="flex items-center text-xs text-emerald-600 mt-2 font-medium">
                         <span className="mr-1">↑ 18.4%</span> net earnings
                     </div>
@@ -140,7 +146,7 @@ export default function Dashboard() {
                             <BedDouble className="w-5 h-5" />
                         </div>
                     </div>
-                    <div className="text-3xl font-extrabold text-slate-900">14 / 42</div>
+                    <div className="text-3xl font-extrabold text-slate-900">{summary?.activeAdmissions ?? '—'} / 42</div>
                     <div className="flex items-center text-xs text-amber-600 mt-2 font-medium">
                         <span className="mr-1">33% capacity</span> • 28 beds available
                     </div>

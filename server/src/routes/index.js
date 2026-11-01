@@ -6,7 +6,7 @@ import { getAppointments, getDoctors, createAppointment, updateAppointmentStatus
 import {
     getConsultationPatients, getMedicalRecords, createMedicalRecord,
     getLabTests, updateLabSampleStatus, updateLabResult,
-    getMedicines, addMedicine, dispenseMedicine
+    getMedicines, addMedicine, dispenseMedicine, getPrescriptionQueue, dispensePrescription
 } from '../controllers/clinicalController.js';
 import { getBills, getBillById, createBill, recordPayment } from '../controllers/billingController.js';
 import { getStaff, createStaff, getAttendance, markAttendance, getReportsSummary, triggerBackup } from '../controllers/staffReportController.js';
@@ -58,6 +58,8 @@ router.patch('/laboratory/:id/result', verifyToken, requireRoles('ADMIN', 'LAB_S
 router.get('/pharmacy', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), getMedicines);
 router.post('/pharmacy', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), addMedicine);
 router.post('/pharmacy/:id/dispense', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), dispenseMedicine);
+router.get('/pharmacy/queue', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), getPrescriptionQueue);
+router.post('/pharmacy/queue/:prescriptionId/dispense', verifyToken, requireRoles('ADMIN', 'PHARMACIST'), dispensePrescription);
 
 // Billing & Invoices (ADMIN, RECEPTIONIST, ACCOUNTANT)
 router.get('/billing', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST', 'ACCOUNTANT'), getBills);
@@ -72,7 +74,7 @@ router.get('/attendance', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), getA
 router.post('/attendance', verifyToken, requireRoles('ADMIN'), markAttendance);
 
 // Reports & Backups (ADMIN, ACCOUNTANT)
-router.get('/reports/summary', verifyToken, requireRoles('ADMIN', 'ACCOUNTANT'), getReportsSummary);
+router.get('/reports/summary', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'LAB_STAFF', 'PHARMACIST', 'ACCOUNTANT'), getReportsSummary);
 router.post('/backup/trigger', verifyToken, requireRoles('ADMIN'), triggerBackup);
 
 export default router;

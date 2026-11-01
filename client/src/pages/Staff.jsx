@@ -21,27 +21,39 @@ export default function Staff() {
         phone: '', email: '', salary: 5000.00
     });
 
-    const toggleAttendance = (id) => {
-        setStaff(staff.map(s => {
-            if (s.id === id) {
-                const newStatus = s.status === 'PRESENT' ? 'ABSENT' : 'PRESENT';
-                return { ...s, status: newStatus };
-            }
-            return s;
-        }));
+    const fetchStaff = async () => {
+        try {
+            const [staffRes, attendanceRes] = await Promise.all([api.get('/staff'), api.get('/attendance')]);
+            const statuses = new Map((attendanceRes.data?.records || []).map(record => [record.employee_id, record.status]));
+            setStaff((staffRes.data?.staff || []).map(member => ({ ...member, status: statuses.get(member.id) || 'ABSENT' })));
+        } catch (error) {
+            alert(error.response?.data?.message || 'Unable to load staff records.');
+        }
     };
 
-    const handleAddStaff = (e) => {
+    useEffect(() => { fetchStaff(); }, []);
+
+    const toggleAttendance = async (staffMember) => {
+        const status = staffMember.status === 'PRESENT' ? 'ABSENT' : 'PRESENT';
+        try {
+            await api.post('/attendance', { employee_id: staffMember.id, status });
+            await fetchStaff();
+        } catch (error) {
+            alert(error.response?.data?.message || 'Unable to update attendance.');
+        }
+    };
+
+    const handleAddStaff = async (e) => {
         e.preventDefault();
-        const newMember = {
-            id: Date.now(),
-            employee_code: `EMP-${Math.floor(100 + Math.random() * 900)}`,
-            status: 'PRESENT',
-            ...formData
-        };
-        setStaff([...staff, newMember]);
-        setIsAddOpen(false);
-        setFormData({ full_name: '', role_title: '', department_name: 'Cardiology', phone: '', email: '', salary: 5000.00 });
+        const departmentIds = { Cardiology: 1, Pediatrics: 2, Orthopedics: 4, Laboratory: 3, Pharmacy: 5, Finance: 5 };
+        try {
+            await api.post('/staff', { ...formData, department_id: departmentIds[formData.department_name] || 1 });
+            await fetchStaff();
+            setIsAddOpen(false);
+            setFormData({ full_name: '', role_title: '', department_name: 'Cardiology', phone: '', email: '', salary: 5000.00 });
+        } catch (error) {
+            alert(error.response?.data?.message || 'Unable to add staff member.');
+        }
     };
 
     const filtered = staff.filter(s =>
@@ -150,7 +162,7 @@ export default function Staff() {
                                     </td>
                                     <td className="px-5 py-4 text-right">
                                         <button
-                                            onClick={() => toggleAttendance(s.id)}
+                                            onClick={() => toggleAttendance(s)}
                                             className={`inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${s.status === 'PRESENT'
                                                     ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
                                                     : 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'

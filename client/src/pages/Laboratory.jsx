@@ -31,10 +31,10 @@ export default function Laboratory() {
     const handleCollectSample = async (testId) => {
         try {
             await api.patch(`/laboratory/${testId}/sample`, { sample_status: 'COLLECTED' });
+            await fetchTests();
         } catch (e) {
-            // local update
+            alert(e.response?.data?.message || 'Unable to update the sample status.');
         }
-        setTests(tests.map(t => t.id === testId ? { ...t, sample_status: 'COLLECTED', test_status: 'IN_PROGRESS' } : t));
     };
 
     const handleOpenResultModal = (test) => {
@@ -46,11 +46,11 @@ export default function Laboratory() {
         e.preventDefault();
         try {
             await api.patch(`/laboratory/${selectedTest.id}/result`, { results: resultText });
+            await fetchTests();
+            setSelectedTest(null);
         } catch (e) {
-            // local update
+            alert(e.response?.data?.message || 'Unable to save the laboratory result.');
         }
-        setTests(tests.map(t => t.id === selectedTest.id ? { ...t, test_status: 'COMPLETED', results: resultText } : t));
-        setSelectedTest(null);
     };
 
     const filtered = tests.filter(t => {

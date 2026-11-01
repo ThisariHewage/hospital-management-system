@@ -253,6 +253,45 @@ export const dispenseMedicine = async (req, res) => {
     }
 };
 
+export const getPrescriptionQueue = async (req, res) => {
+    try {
+        const [queue] = await pool.query(`
+            SELECT pi.id, p.id AS prescription_id, pa.full_name AS patient_name, d.full_name AS doctor_name,
+                   pi.medicine_id, m.name AS medicine_name, pi.dosage, pi.frequency, pi.duration,
+                   1 AS quantity, p.status
+            FROM prescriptions p
+            JOIN prescription_items pi ON pi.prescription_id = p.id
+            JOIN patients pa ON pa.id = p.patient_id
+            JOIN doctors d ON d.id = p.doctor_id
+            JOIN medicines m ON m.id = pi.medicine_id
+            WHERE p.status = 'PENDING'
+            ORDER BY p.id DESC, pi.id ASC`);
+        res.json({ success: true, queue });
+    } catch (error) {
+        console.error('getPrescriptionQueue error:', error);
+        res.status(500).json({ success: false, message: 'Failed to retrieve prescription queue.' });
+    }
+};
+
+export const dispensePrescription = async (req, res) => {
+    try {
+        const { prescriptionId } = req.params;
+        const [items] = await pool.query('SELECT medicine_id FROM prescription_items WHERE prescription_id = ?', [prescriptionId]);
+        if (!items.length) return res.status(404).json({ success: false, message: 'Prescription not found.' });
+        for (const item of items) {
+            const [medicines] = await pool.query('SELECT stock_quantity, name FROM medicines WHERE id = ?', [item.medicine_id]);
+            if (!medicines.length || medicines[0].stock_quantity < 1) return res.status(400).json({ success: false, message: `Insufficient stock for ${medicines[0]?.name || 'a prescribed medicine'}.` });
+        }
+        for (const item of items) await pool.query('UPDATE medicines SET stock_quantity = stock_quantity - 1 WHERE id = ?', [item.medicine_id]);
+        await pool.query("UPDATE prescriptions SET status = 'DISPENSED' WHERE id = ?", [prescriptionId]);
+        await logAudit(req.user?.id, 'DISPENSE_PRESCRIPTION', 'prescriptions', prescriptionId, 'Prescription dispensed', req);
+        res.json({ success: true, message: 'Prescription dispensed.' });
+    } catch (error) {
+        console.error('dispensePrescription error:', error);
+        res.status(500).json({ success: false, message: 'Failed to dispense prescription.' });
+    }
+};
+
 export default {
     getConsultationPatients,
     getMedicalRecords,
@@ -262,5 +301,7 @@ export default {
     updateLabResult,
     getMedicines,
     addMedicine,
-    dispenseMedicine
+    dispenseMedicine,
+    getPrescriptionQueue,
+    dispensePrescription
 };

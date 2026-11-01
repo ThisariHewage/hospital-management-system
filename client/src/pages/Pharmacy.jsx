@@ -10,14 +10,9 @@ const INITIAL_MEDICINES = [
     { id: 5, name: 'Azithromycin 250mg', generic_name: 'Azithromycin', category: 'Antibiotics', stock_quantity: 85, min_stock_alert: 20, unit_price: 18.00, batch_number: 'AZT-2026-D', expiry_date: '2027-09-30' },
 ];
 
-const INITIAL_PRESCRIPTION_QUEUE = [
-    { id: 1, rx_code: 'RX-8801', patient_name: 'James Wilson', doctor_name: 'Dr. Robert Smith', medicine_id: 3, medicine_name: 'Atorvastatin 20mg', quantity: 30, dosage: '1 tab daily', status: 'WAITING_DISPENSE' },
-    { id: 2, rx_code: 'RX-8802', patient_name: 'Eleanor Rigby', doctor_name: 'Dr. Sarah Jenkins', medicine_id: 1, medicine_name: 'Amoxicillin 500mg', quantity: 14, dosage: '1 cap twice daily', status: 'WAITING_DISPENSE' }
-];
-
 export default function Pharmacy() {
     const [medicines, setMedicines] = useState(INITIAL_MEDICINES);
-    const [queue, setQueue] = useState(INITIAL_PRESCRIPTION_QUEUE);
+    const [queue, setQueue] = useState([]);
     const [search, setSearch] = useState('');
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [dispenseSuccess, setDispenseSuccess] = useState('');
@@ -31,8 +26,9 @@ export default function Pharmacy() {
 
     const fetchMedicines = async () => {
         try {
-            const res = await api.get('/pharmacy');
+            const [res, queueRes] = await Promise.all([api.get('/pharmacy'), api.get('/pharmacy/queue')]);
             if (res.data?.medicines?.length > 0) setMedicines(res.data.medicines);
+            setQueue(queueRes.data?.queue || []);
         } catch (e) {
             // fallback
         }
@@ -44,16 +40,12 @@ export default function Pharmacy() {
 
     const handleDispense = async (rx) => {
         try {
-            await api.post(`/pharmacy/${rx.medicine_id}/dispense`, { quantity: rx.quantity });
+            await api.post(`/pharmacy/queue/${rx.prescription_id}/dispense`);
+            await fetchMedicines();
+            setDispenseSuccess(`Dispensed ${rx.quantity} units of ${rx.medicine_name} to ${rx.patient_name}`);
         } catch (e) {
-            // local update
+            setDispenseSuccess(e.response?.data?.message || 'Unable to dispense medicine.');
         }
-
-        // Deduct local stock
-        setMedicines(medicines.map(m => m.id === rx.medicine_id ? { ...m, stock_quantity: Math.max(0, m.stock_quantity - rx.quantity) } : m));
-        // Remove from queue
-        setQueue(queue.filter(q => q.id !== rx.id));
-        setDispenseSuccess(`Dispensed ${rx.quantity} units of ${rx.medicine_name} to ${rx.patient_name}`);
         setTimeout(() => setDispenseSuccess(''), 4000);
     };
 
@@ -61,13 +53,11 @@ export default function Pharmacy() {
         e.preventDefault();
         try {
             await api.post('/pharmacy', form);
+            await fetchMedicines();
+            setIsAddOpen(false);
         } catch (e) {
-            // local add
+            alert(e.response?.data?.message || 'Unable to add medicine.');
         }
-
-        const newMed = { id: Date.now(), ...form };
-        setMedicines([...medicines, newMed]);
-        setIsAddOpen(false);
     };
 
     const filteredMeds = medicines.filter(m =>

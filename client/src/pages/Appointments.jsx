@@ -69,39 +69,22 @@ export default function Appointments() {
     const handleStatusUpdate = async (id, newStatus) => {
         try {
             await api.patch(`/appointments/${id}/status`, { status: newStatus });
+            await fetchAppointments();
         } catch (e) {
-            // Local update
+            alert(e.response?.data?.message || 'Unable to update the appointment.');
         }
-        setAppointments(appointments.map(a => a.id === id ? { ...a, status: newStatus } : a));
     };
 
     const handleBookAppointment = async (e) => {
         e.preventDefault();
-        const selectedPatient = patients.find(p => p.id === Number(formData.patient_id));
-        const selectedDoctor = doctors.find(d => d.id === Number(formData.doctor_id));
-
-        const newApt = {
-            id: Date.now(),
-            appointment_code: `APT-${Math.floor(1000 + Math.random() * 9000)}`,
-            patient_name: selectedPatient ? selectedPatient.full_name : 'Patient',
-            patient_code: selectedPatient ? selectedPatient.patient_code : 'PAT-2026',
-            doctor_name: selectedDoctor ? selectedDoctor.full_name : 'Doctor',
-            department_name: selectedDoctor ? selectedDoctor.department_name : 'General',
-            appointment_date: formData.appointment_date,
-            time_slot: formData.time_slot,
-            reason: formData.reason || 'Consultation',
-            status: 'SCHEDULED'
-        };
-
         try {
             await api.post('/appointments', formData);
+            await fetchAppointments();
+            setIsBookingOpen(false);
+            setFormData({ ...formData, reason: '' });
         } catch (e) {
-            // offline mode
+            alert(e.response?.data?.message || 'Unable to book the appointment.');
         }
-
-        setAppointments([newApt, ...appointments]);
-        setIsBookingOpen(false);
-        setFormData({ ...formData, reason: '' });
     };
 
     const filtered = appointments.filter(a => {

@@ -103,21 +103,11 @@ export default function Billing() {
                 amount: amt,
                 payment_method: paymentMethod
             });
+            await fetchBills();
+            setIsPaymentOpen(false);
         } catch (e) {
-            // offline mode
+            alert(e.response?.data?.message || 'Unable to record payment.');
         }
-
-        const updated = bills.map(b => {
-            if (b.id === selectedBillForPay.id) {
-                const newPaid = Number(b.paid_amount) + amt;
-                const newStatus = newPaid >= Number(b.total_amount) ? 'PAID' : 'PARTIAL';
-                return { ...b, paid_amount: newPaid, status: newStatus };
-            }
-            return b;
-        });
-
-        setBills(updated);
-        setIsPaymentOpen(false);
     };
 
     const handlePrintInvoice = () => {

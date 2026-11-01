@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { BarChart3, Download, DollarSign, Users, Calendar, Pill, TrendingUp, Filter } from 'lucide-react';
-
-const REVENUE_DATA = [
-    { id: 1, date: '2026-10-12', category: 'Consultations', invoices_count: 14, billed: 1250.00, collected: 1100.00 },
-    { id: 2, date: '2026-10-12', category: 'Pharmacy Sales', invoices_count: 28, billed: 890.50, collected: 890.50 },
-    { id: 3, date: '2026-10-12', category: 'Laboratory Diagnostics', invoices_count: 9, billed: 720.00, collected: 650.00 },
-    { id: 4, date: '2026-10-12', category: 'Inpatient Admissions', invoices_count: 3, billed: 2100.00, collected: 1800.00 },
-    { id: 5, date: '2026-10-11', category: 'Consultations', invoices_count: 18, billed: 1600.00, collected: 1550.00 },
-    { id: 6, date: '2026-10-11', category: 'Pharmacy Sales', invoices_count: 32, billed: 1040.00, collected: 1040.00 },
-    { id: 7, date: '2026-10-10', category: 'Inpatient Admissions', invoices_count: 4, billed: 2800.00, collected: 2400.00 },
-];
+import api from '../api/axios';
 
 export default function Reports() {
     const [activeTab, setActiveTab] = useState('financial');
     const [dateRange, setDateRange] = useState('today');
+    const [summary, setSummary] = useState(null);
+    const [revenueData, setRevenueData] = useState([]);
+
+    useEffect(() => {
+        api.get('/reports/summary').then(res => {
+            setSummary(res.data?.summary || null);
+            setRevenueData(res.data?.revenueBreakdown || []);
+        }).catch(() => setRevenueData([]));
+    }, []);
 
     const exportToCSV = (data, filename) => {
         if (!data || !data.length) return;
@@ -31,8 +31,8 @@ export default function Reports() {
         document.body.removeChild(link);
     };
 
-    const totalBilled = REVENUE_DATA.reduce((acc, cur) => acc + cur.billed, 0);
-    const totalCollected = REVENUE_DATA.reduce((acc, cur) => acc + cur.collected, 0);
+    const totalBilled = Number(summary?.totalRevenue || 0) + Number(summary?.pendingRevenue || 0);
+    const totalCollected = Number(summary?.totalRevenue || 0);
 
     return (
         <div className="space-y-6">
@@ -42,7 +42,7 @@ export default function Reports() {
                     <p className="text-sm text-slate-500">Hospital financial performance, clinical throughput, and instant CSV export</p>
                 </div>
                 <button
-                    onClick={() => exportToCSV(REVENUE_DATA, 'medicore_revenue_report')}
+                    onClick={() => exportToCSV(revenueData, 'medicore_revenue_report')}
                     className="inline-flex items-center space-x-2 bg-gradient-to-r from-teal-600 to-teal-500 hover:from-teal-700 text-white font-medium px-4 py-2.5 rounded-lg shadow-md shadow-teal-500/20 text-sm transition"
                 >
                     <Download className="w-4 h-4" />
@@ -69,7 +69,7 @@ export default function Reports() {
                 </div>
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
                     <span className="text-xs font-semibold uppercase text-slate-400 block mb-1">Total Invoices</span>
-                    <h3 className="text-2xl font-black text-slate-800">107</h3>
+                    <h3 className="text-2xl font-black text-slate-800">{summary?.invoiceCount ?? 0}</h3>
                     <span className="text-[11px] text-slate-500 font-medium">Across 7 departments</span>
                 </div>
             </div>
@@ -94,8 +94,8 @@ export default function Reports() {
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                            {REVENUE_DATA.map((row) => (
-                                <tr key={row.id} className="hover:bg-slate-50/70 transition">
+                            {revenueData.map((row, index) => (
+                                <tr key={`${row.date}-${index}`} className="hover:bg-slate-50/70 transition">
                                     <td className="px-5 py-4 font-mono text-xs text-slate-700">
                                         {row.date}
                                     </td>
@@ -106,13 +106,13 @@ export default function Reports() {
                                         {row.invoices_count} transactions
                                     </td>
                                     <td className="px-5 py-4 font-bold text-slate-800">
-                                        ${row.billed.toFixed(2)}
+                                        ${Number(row.billed || 0).toFixed(2)}
                                     </td>
                                     <td className="px-5 py-4 font-bold text-emerald-600">
-                                        ${row.collected.toFixed(2)}
+                                        ${Number(row.collected || 0).toFixed(2)}
                                     </td>
                                     <td className="px-5 py-4 text-right font-medium text-rose-600">
-                                        -${(row.billed - row.collected).toFixed(2)}
+                                        -${(Number(row.billed || 0) - Number(row.collected || 0)).toFixed(2)}
                                     </td>
                                 </tr>
                             ))}
