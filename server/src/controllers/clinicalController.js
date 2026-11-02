@@ -30,7 +30,7 @@ export const getConsultationPatients = async (req, res) => {
             FROM appointments a
             JOIN patients p ON p.id = a.patient_id
             JOIN doctors d ON d.id = a.doctor_id
-            WHERE a.status = 'SCHEDULED'${doctorFilter}
+            WHERE a.status IN ('SCHEDULED', 'RESCHEDULED')${doctorFilter}
             ORDER BY a.appointment_date ASC, a.time_slot ASC
         `, params);
 
@@ -86,7 +86,7 @@ export const createMedicalRecord = async (req, res) => {
         } else {
             const [appointmentRows] = await pool.query(
                 `SELECT doctor_id FROM appointments
-                 WHERE patient_id = ? AND status = 'SCHEDULED'
+                 WHERE patient_id = ? AND status IN ('SCHEDULED', 'RESCHEDULED')
                  ORDER BY appointment_date ASC, time_slot ASC LIMIT 1`,
                 [patient_id]
             );
@@ -97,7 +97,7 @@ export const createMedicalRecord = async (req, res) => {
         }
 
         const [appointmentRows] = await pool.query(
-            'SELECT id FROM appointments WHERE patient_id = ? AND doctor_id = ? AND status = \'SCHEDULED\' LIMIT 1',
+            "SELECT id FROM appointments WHERE patient_id = ? AND doctor_id = ? AND status IN ('SCHEDULED', 'RESCHEDULED') LIMIT 1",
             [patient_id, doctorId]
         );
         if (appointmentRows.length === 0) {

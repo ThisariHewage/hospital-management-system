@@ -159,4 +159,23 @@ export const updateAppointmentStatus = async (req, res) => {
     }
 };
 
-export default { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus };
+export const rescheduleAppointment = async (req, res) => {
+    try {
+        const { appointment_date, time_slot, doctor_id } = req.body;
+        if (!appointment_date || !time_slot) return res.status(400).json({ success: false, message: 'New appointment date and time are required.' });
+        const [appointments] = await pool.query('SELECT appointment_code FROM appointments WHERE id = ?', [req.params.id]);
+        if (!appointments.length) return res.status(404).json({ success: false, message: 'Appointment not found.' });
+        const [result] = await pool.query(
+            `UPDATE appointments SET appointment_date = ?, time_slot = ?, doctor_id = COALESCE(?, doctor_id), status = 'RESCHEDULED' WHERE id = ? AND status IN ('SCHEDULED', 'RESCHEDULED')`,
+            [appointment_date, time_slot, doctor_id || null, req.params.id]
+        );
+        if (!result.affectedRows) return res.status(400).json({ success: false, message: 'Only active appointments can be rescheduled.' });
+        await logAudit(req.user?.id, 'RESCHEDULE_APPOINTMENT', 'appointments', req.params.id, `Rescheduled ${appointments[0].appointment_code} to ${appointment_date} ${time_slot}`, req);
+        res.json({ success: true, message: 'Appointment rescheduled.' });
+    } catch (error) {
+        console.error('rescheduleAppointment error:', error);
+        res.status(500).json({ success: false, message: 'Failed to reschedule appointment.' });
+    }
+};
+
+export default { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus, rescheduleAppointment };

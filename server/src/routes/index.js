@@ -2,7 +2,7 @@ import express from 'express';
 import authRoutes from './authRoutes.js';
 import auditRoutes from './auditRoutes.js';
 import { getPatients, getPatientById, createPatient, updatePatient, uploadPatientDocument, downloadPatientDocument } from '../controllers/patientController.js';
-import { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus } from '../controllers/appointmentController.js';
+import { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus, rescheduleAppointment } from '../controllers/appointmentController.js';
 import {
     getConsultationPatients, getMedicalRecords, createMedicalRecord,
     getLabTests, updateLabSampleStatus, updateLabResult,
@@ -39,6 +39,7 @@ router.get('/patients/documents/:documentId/file', verifyToken, requireRoles('AD
 router.get('/appointments', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), getAppointments);
 router.post('/appointments', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createAppointment);
 router.patch('/appointments/:id/status', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), updateAppointmentStatus);
+router.patch('/appointments/:id/reschedule', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), rescheduleAppointment);
 router.get('/doctors', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getDoctors);
 router.get('/departments', verifyToken, requireRoles('ADMIN'), getDepartments);
 router.post('/doctors', verifyToken, requireRoles('ADMIN'), createDoctor);

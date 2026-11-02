@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Plus, Filter, Search, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Clock, User, CheckCircle2, XCircle, Plus, Filter, Search, X, CalendarClock } from 'lucide-react';
 
 const INITIAL_APPOINTMENTS = [
     { id: 1, appointment_code: 'APT-1001', patient_name: 'James Wilson', patient_code: 'PAT-2026-0001', doctor_name: 'Dr. Robert Smith', department_name: 'Cardiology', appointment_date: '2026-10-12', time_slot: '09:30 AM', reason: 'Routine cardiovascular follow-up', status: 'SCHEDULED' },
@@ -22,6 +22,8 @@ export default function Appointments() {
     const [statusFilter, setStatusFilter] = useState('');
     const [search, setSearch] = useState('');
     const [isBookingOpen, setIsBookingOpen] = useState(false);
+    const [rescheduling, setRescheduling] = useState(null);
+    const [rescheduleData, setRescheduleData] = useState({ appointment_date: '', time_slot: '', doctor_id: '' });
     const [doctors, setDoctors] = useState([
         { id: 1, full_name: 'Dr. Robert Smith', department_name: 'Cardiology' },
         { id: 2, full_name: 'Dr. Sarah Jenkins', department_name: 'Pediatrics' },
@@ -87,6 +89,19 @@ export default function Appointments() {
         }
     };
 
+    const openReschedule = (appointment) => {
+        setRescheduling(appointment);
+        setRescheduleData({ appointment_date: appointment.appointment_date?.slice(0, 10), time_slot: appointment.time_slot, doctor_id: String(appointment.doctor_id) });
+    };
+    const handleReschedule = async (e) => {
+        e.preventDefault();
+        try {
+            await api.patch(`/appointments/${rescheduling.id}/reschedule`, rescheduleData);
+            await fetchAppointments();
+            setRescheduling(null);
+        } catch (error) { alert(error.response?.data?.message || 'Unable to reschedule appointment.'); }
+    };
+
     const filtered = appointments.filter(a => {
         const matchesStatus = statusFilter ? a.status === statusFilter : true;
         const matchesSearch =
@@ -142,6 +157,7 @@ export default function Appointments() {
                     >
                         <option value="">All Statuses</option>
                         <option value="SCHEDULED">Scheduled</option>
+                        <option value="RESCHEDULED">Rescheduled</option>
                         <option value="COMPLETED">Completed</option>
                         <option value="CANCELLED">Cancelled</option>
                     </select>
@@ -192,8 +208,16 @@ export default function Appointments() {
                         </div>
 
                         {/* Action buttons */}
-                        {apt.status === 'SCHEDULED' && (
+                        {['SCHEDULED', 'RESCHEDULED'].includes(apt.status) && (
                             <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-end space-x-2">
+                                <button
+                                    onClick={() => openReschedule(apt)}
+                                    disabled={isDoctor}
+                                    className="inline-flex items-center space-x-1 text-xs font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 px-2.5 py-1.5 rounded-lg transition disabled:hidden"
+                                >
+                                    <CalendarClock className="w-3.5 h-3.5" />
+                                    <span>Reschedule</span>
+                                </button>
                                 <button
                                     onClick={() => handleStatusUpdate(apt.id, 'COMPLETED')}
                                     className="inline-flex items-center space-x-1 text-xs font-semibold bg-emerald-50 text-emerald-700 hover:bg-emerald-100 px-2.5 py-1.5 rounded-lg transition"
@@ -298,6 +322,20 @@ export default function Appointments() {
                                     Confirm Booking
                                 </button>
                             </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {rescheduling && (
+                <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-slate-200">
+                        <div className="flex justify-between items-center border-b pb-3 mb-4"><div><h3 className="font-bold text-slate-800">Reschedule Appointment</h3><p className="text-xs text-slate-500">{rescheduling.patient_name}</p></div><button onClick={() => setRescheduling(null)}><X className="w-5 h-5" /></button></div>
+                        <form onSubmit={handleReschedule} className="space-y-3">
+                            <label className="block text-xs font-semibold text-slate-500">Doctor<select value={rescheduleData.doctor_id} onChange={e => setRescheduleData({ ...rescheduleData, doctor_id: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">{doctors.map(d => <option key={d.id} value={d.id}>{d.full_name} — {d.department_name}</option>)}</select></label>
+                            <label className="block text-xs font-semibold text-slate-500">New date<input required type="date" value={rescheduleData.appointment_date} onChange={e => setRescheduleData({ ...rescheduleData, appointment_date: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm" /></label>
+                            <label className="block text-xs font-semibold text-slate-500">New time<select value={rescheduleData.time_slot} onChange={e => setRescheduleData({ ...rescheduleData, time_slot: e.target.value })} className="mt-1 w-full border rounded-lg px-3 py-2 text-sm">{TIME_SLOTS.map(slot => <option key={slot}>{slot}</option>)}</select></label>
+                            <button className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-semibold">Confirm Reschedule</button>
                         </form>
                     </div>
                 </div>
