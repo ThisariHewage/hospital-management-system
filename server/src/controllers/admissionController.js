@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { logAudit } from '../middleware/auditLogger.js';
+import { createAutomaticInvoice } from '../utils/billingService.js';
 
 export const getAdmissions = async (req, res) => {
     try {
@@ -48,6 +49,7 @@ export const createAdmission = async (req, res) => {
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [admissionCode, patient_id, department_id, bed_number, room_type || 'General', daily_rate || 100, diagnosis || null]
         );
+        await createAutomaticInvoice(patient_id, [{ description: `Admission charge — ${room_type || 'General'} bed ${bed_number} (first day)`, item_type: 'ADMISSION', unit_price: daily_rate || 100 }]);
         await logAudit(req.user.id, 'CREATE_ADMISSION', 'admissions', result.insertId, `Created admission ${admissionCode}`, req);
         res.status(201).json({ success: true, admissionId: result.insertId, admission_code: admissionCode });
     } catch (error) {

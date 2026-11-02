@@ -1,5 +1,6 @@
 import pool from '../config/db.js';
 import { logAudit } from '../middleware/auditLogger.js';
+import { createAutomaticInvoice } from '../utils/billingService.js';
 
 // ==========================================
 // EMR (Medical Records & Prescriptions)
@@ -112,6 +113,9 @@ export const createMedicalRecord = async (req, res) => {
 
         const recordId = recResult.insertId;
 
+        const [doctorRows] = await pool.query('SELECT consultation_fee FROM doctors WHERE id = ?', [doctorId]);
+        await createAutomaticInvoice(patient_id, [{ description: `Consultation — ${diagnosis}`, item_type: 'CONSULTATION', unit_price: doctorRows[0]?.consultation_fee || 0 }]);
+
         // If prescriptions were added, insert into prescriptions table
         if (Array.isArray(prescriptions) && prescriptions.length > 0) {
             const [prescResult] = await pool.query(
@@ -168,6 +172,7 @@ export const createLabTest = async (req, res) => {
              VALUES (?, ?, ?, ?, ?, ?, ?)`,
             [testCode, patient_id, test_name, category, sample_type || 'Blood', normal_range || null, cost || 30]
         );
+        await createAutomaticInvoice(patient_id, [{ description: `Laboratory test — ${test_name}`, item_type: 'LAB', unit_price: cost || 30 }]);
         await logAudit(req.user?.id, 'CREATE_LAB_TEST_REQUEST', 'lab_tests', result.insertId, `Created laboratory request ${testCode}`, req);
         res.status(201).json({ success: true, testId: result.insertId, test_code: testCode });
     } catch (error) {
@@ -302,7 +307,13 @@ export const getPrescriptionQueue = async (req, res) => {
 export const dispensePrescription = async (req, res) => {
     try {
         const { prescriptionId } = req.params;
-        const [items] = await pool.query('SELECT medicine_id FROM prescription_items WHERE prescription_id = ?', [prescriptionId]);
+        const [items] = await pool.query(
+            `SELECT pi.medicine_id, p.patient_id, m.name, m.unit_price
+             FROM prescription_items pi
+             JOIN prescriptions p ON p.id = pi.prescription_id
+             JOIN medicines m ON m.id = pi.medicine_id
+             WHERE pi.prescription_id = ?`, [prescriptionId]
+        );
         if (!items.length) return res.status(404).json({ success: false, message: 'Prescription not found.' });
         for (const item of items) {
             const [medicines] = await pool.query('SELECT stock_quantity, name, expiry_date FROM medicines WHERE id = ?', [item.medicine_id]);
@@ -311,6 +322,7 @@ export const dispensePrescription = async (req, res) => {
         }
         for (const item of items) await pool.query('UPDATE medicines SET stock_quantity = stock_quantity - 1 WHERE id = ?', [item.medicine_id]);
         await pool.query("UPDATE prescriptions SET status = 'DISPENSED' WHERE id = ?", [prescriptionId]);
+        await createAutomaticInvoice(items[0].patient_id, items.map(item => ({ description: `Pharmacy medicine — ${item.name}`, item_type: 'PHARMACY', unit_price: item.unit_price })));
         await logAudit(req.user?.id, 'DISPENSE_PRESCRIPTION', 'prescriptions', prescriptionId, 'Prescription dispensed', req);
         res.json({ success: true, message: 'Prescription dispensed.' });
     } catch (error) {
