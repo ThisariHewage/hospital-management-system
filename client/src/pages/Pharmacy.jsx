@@ -65,6 +65,8 @@ export default function Pharmacy() {
         m.generic_name?.toLowerCase().includes(search.toLowerCase()) ||
         m.category?.toLowerCase().includes(search.toLowerCase())
     );
+    const expiredMeds = medicines.filter(m => m.expiry_status === 'EXPIRED');
+    const expiringSoonMeds = medicines.filter(m => m.expiry_status === 'EXPIRING_SOON');
 
     return (
         <div className="space-y-6">
@@ -86,6 +88,13 @@ export default function Pharmacy() {
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl text-sm font-semibold flex items-center space-x-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                     <span>{dispenseSuccess}</span>
+                </div>
+            )}
+
+            {(expiredMeds.length > 0 || expiringSoonMeds.length > 0) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {expiredMeds.length > 0 && <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-900"><div className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {expiredMeds.length} expired medicine{expiredMeds.length !== 1 ? 's' : ''}</div><p className="text-xs mt-1">Do not dispense: {expiredMeds.map(m => m.name).join(', ')}</p></div>}
+                    {expiringSoonMeds.length > 0 && <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900"><div className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4" /> {expiringSoonMeds.length} medicine{expiringSoonMeds.length !== 1 ? 's' : ''} expiring within 90 days</div><p className="text-xs mt-1">Review stock: {expiringSoonMeds.map(m => m.name).join(', ')}</p></div>}
                 </div>
             )}
 
@@ -151,6 +160,8 @@ export default function Pharmacy() {
                         <tbody className="divide-y divide-slate-100">
                             {filteredMeds.map(m => {
                                 const isLowStock = m.stock_quantity <= m.min_stock_alert;
+                                const isExpired = m.expiry_status === 'EXPIRED';
+                                const isExpiringSoon = m.expiry_status === 'EXPIRING_SOON';
                                 return (
                                     <tr key={m.id} className="hover:bg-slate-50/70 transition">
                                         <td className="px-5 py-4">
@@ -176,7 +187,11 @@ export default function Pharmacy() {
                                             <span className="block text-slate-400">Exp: {new Date(m.expiry_date).toLocaleDateString()}</span>
                                         </td>
                                         <td className="px-5 py-4 text-right">
-                                            {isLowStock ? (
+                                            {isExpired ? (
+                                                <span className="inline-flex items-center text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full"><AlertTriangle className="w-3 h-3 mr-1" />Expired</span>
+                                            ) : isExpiringSoon ? (
+                                                <span className="inline-flex items-center text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full"><AlertTriangle className="w-3 h-3 mr-1" />Expires in {m.days_to_expiry}d</span>
+                                            ) : isLowStock ? (
                                                 <span className="inline-flex items-center text-xs font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full">
                                                     <AlertTriangle className="w-3 h-3 mr-1 text-rose-500" />
                                                     Low Stock

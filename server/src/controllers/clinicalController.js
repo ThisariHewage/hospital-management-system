@@ -218,7 +218,12 @@ export const updateLabResult = async (req, res) => {
 export const getMedicines = async (req, res) => {
     try {
         const [medicines] = await pool.query(`
-            SELECT * FROM medicines ORDER BY stock_quantity ASC, name ASC
+            SELECT *,
+                   DATEDIFF(expiry_date, CURDATE()) AS days_to_expiry,
+                   CASE WHEN expiry_date < CURDATE() THEN 'EXPIRED'
+                        WHEN expiry_date <= DATE_ADD(CURDATE(), INTERVAL 90 DAY) THEN 'EXPIRING_SOON'
+                        ELSE 'VALID' END AS expiry_status
+            FROM medicines ORDER BY expiry_date ASC, stock_quantity ASC, name ASC
         `);
         res.json({ success: true, count: medicines.length, medicines });
     } catch (error) {
@@ -255,6 +260,9 @@ export const dispenseMedicine = async (req, res) => {
         if (meds.length === 0) return res.status(404).json({ success: false, message: 'Medicine not found.' });
 
         const med = meds[0];
+        if (new Date(med.expiry_date) < new Date(new Date().toDateString())) {
+            return res.status(400).json({ success: false, message: `${med.name} is expired and cannot be dispensed.` });
+        }
         if (med.stock_quantity < quantity) {
             return res.status(400).json({ success: false, message: `Insufficient stock! Only ${med.stock_quantity} units available.` });
         }
@@ -297,8 +305,9 @@ export const dispensePrescription = async (req, res) => {
         const [items] = await pool.query('SELECT medicine_id FROM prescription_items WHERE prescription_id = ?', [prescriptionId]);
         if (!items.length) return res.status(404).json({ success: false, message: 'Prescription not found.' });
         for (const item of items) {
-            const [medicines] = await pool.query('SELECT stock_quantity, name FROM medicines WHERE id = ?', [item.medicine_id]);
+            const [medicines] = await pool.query('SELECT stock_quantity, name, expiry_date FROM medicines WHERE id = ?', [item.medicine_id]);
             if (!medicines.length || medicines[0].stock_quantity < 1) return res.status(400).json({ success: false, message: `Insufficient stock for ${medicines[0]?.name || 'a prescribed medicine'}.` });
+            if (new Date(medicines[0].expiry_date) < new Date(new Date().toDateString())) return res.status(400).json({ success: false, message: `${medicines[0].name} is expired and cannot be dispensed.` });
         }
         for (const item of items) await pool.query('UPDATE medicines SET stock_quantity = stock_quantity - 1 WHERE id = ?', [item.medicine_id]);
         await pool.query("UPDATE prescriptions SET status = 'DISPENSED' WHERE id = ?", [prescriptionId]);
