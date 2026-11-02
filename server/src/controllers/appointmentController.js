@@ -66,6 +66,49 @@ export const getDoctors = async (req, res) => {
     }
 };
 
+export const getDepartments = async (req, res) => {
+    try {
+        const [departments] = await pool.query('SELECT id, name FROM departments ORDER BY name');
+        res.json({ success: true, departments });
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to retrieve departments.' });
+    }
+};
+
+export const createDoctor = async (req, res) => {
+    try {
+        const { full_name, department_id, specialization, phone, consultation_fee, schedule_days, schedule_time } = req.body;
+        if (!full_name || !department_id || !specialization || !phone) return res.status(400).json({ success: false, message: 'Name, department, specialization, and phone are required.' });
+        const [result] = await pool.query(
+            `INSERT INTO doctors (department_id, full_name, specialization, phone, consultation_fee, schedule_days, schedule_time)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [department_id, full_name, specialization, phone, consultation_fee || 50, schedule_days || 'Mon,Tue,Wed,Thu,Fri', schedule_time || '09:00 - 17:00']
+        );
+        await logAudit(req.user?.id, 'CREATE_DOCTOR', 'doctors', result.insertId, `Added doctor ${full_name}`, req);
+        res.status(201).json({ success: true, doctorId: result.insertId });
+    } catch (error) {
+        console.error('createDoctor error:', error);
+        res.status(500).json({ success: false, message: 'Failed to add doctor.' });
+    }
+};
+
+export const updateDoctor = async (req, res) => {
+    try {
+        const { full_name, department_id, specialization, phone, consultation_fee, schedule_days, schedule_time } = req.body;
+        if (!full_name || !department_id || !specialization || !phone) return res.status(400).json({ success: false, message: 'Name, department, specialization, and phone are required.' });
+        const [result] = await pool.query(
+            `UPDATE doctors SET full_name = ?, department_id = ?, specialization = ?, phone = ?, consultation_fee = ?, schedule_days = ?, schedule_time = ? WHERE id = ?`,
+            [full_name, department_id, specialization, phone, consultation_fee || 50, schedule_days || 'Mon,Tue,Wed,Thu,Fri', schedule_time || '09:00 - 17:00', req.params.id]
+        );
+        if (!result.affectedRows) return res.status(404).json({ success: false, message: 'Doctor not found.' });
+        await logAudit(req.user?.id, 'UPDATE_DOCTOR', 'doctors', req.params.id, `Updated doctor ${full_name}`, req);
+        res.json({ success: true, message: 'Doctor updated.' });
+    } catch (error) {
+        console.error('updateDoctor error:', error);
+        res.status(500).json({ success: false, message: 'Failed to update doctor.' });
+    }
+};
+
 export const createAppointment = async (req, res) => {
     try {
         const { patient_id, doctor_id, appointment_date, time_slot, reason } = req.body;
@@ -116,4 +159,4 @@ export const updateAppointmentStatus = async (req, res) => {
     }
 };
 
-export default { getAppointments, getDoctors, createAppointment, updateAppointmentStatus };
+export default { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus };

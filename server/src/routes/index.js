@@ -2,7 +2,7 @@ import express from 'express';
 import authRoutes from './authRoutes.js';
 import auditRoutes from './auditRoutes.js';
 import { getPatients, getPatientById, createPatient, updatePatient, uploadPatientDocument, downloadPatientDocument } from '../controllers/patientController.js';
-import { getAppointments, getDoctors, createAppointment, updateAppointmentStatus } from '../controllers/appointmentController.js';
+import { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus } from '../controllers/appointmentController.js';
 import {
     getConsultationPatients, getMedicalRecords, createMedicalRecord,
     getLabTests, updateLabSampleStatus, updateLabResult,
@@ -40,6 +40,9 @@ router.get('/appointments', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPT
 router.post('/appointments', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createAppointment);
 router.patch('/appointments/:id/status', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'RECEPTIONIST'), updateAppointmentStatus);
 router.get('/doctors', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getDoctors);
+router.get('/departments', verifyToken, requireRoles('ADMIN'), getDepartments);
+router.post('/doctors', verifyToken, requireRoles('ADMIN'), createDoctor);
+router.patch('/doctors/:id', verifyToken, requireRoles('ADMIN'), updateDoctor);
 
 // Admissions & inpatient vital signs
 router.get('/admissions', verifyToken, requireRoles('ADMIN', 'NURSE', 'DOCTOR'), getAdmissions);

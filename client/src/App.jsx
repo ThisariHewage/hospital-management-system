@@ -36,6 +36,7 @@ import Billing from './pages/Billing';
 import Staff from './pages/Staff';
 import Reports from './pages/Reports';
 import AuditLogs from './pages/AuditLogs';
+import Doctors from './pages/Doctors';
 
 /**
  * Common Workspace Layout
@@ -163,6 +164,10 @@ export default function App() {
                                                 <Patients />
                                             </RoleBasedRoute>
                                         }
+                                    />
+                                    <Route
+                                        path="/doctors"
+                                        element={<RoleBasedRoute allowedRoles={['ADMIN']}><Doctors /></RoleBasedRoute>}
                                     />
                                     <Route
                                         path="/appointments"

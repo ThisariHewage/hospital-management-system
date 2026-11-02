@@ -87,6 +87,7 @@ export const ROLE_DETAILS = {
  * Page access permission matrix: maps pages to allowed roles
  */
 export const PAGE_PERMISSIONS = {
+    '/doctors': ['ADMIN'],
     '/patients': ['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'],
     '/appointments': ['ADMIN', 'DOCTOR', 'RECEPTIONIST'],
     '/emr': ['ADMIN', 'DOCTOR'],

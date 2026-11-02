@@ -5,10 +5,11 @@ import { getRoleDashboard, ROLE_DETAILS } from '../utils/rbacConfig';
 import {
     Activity, Users, Calendar, Stethoscope, TestTube2,
     Pill, Receipt, UserCheck, BarChart3, ShieldCheck,
-    BedDouble, LogOut, Menu, X, Shield
+    BedDouble, LogOut, Menu, X, Shield, UserRoundCog
 } from 'lucide-react';
 
 const ALL_NAV_ITEMS = [
+    { id: 'doctors', label: 'Doctor Management', icon: UserRoundCog, path: '/doctors', roles: ['ADMIN'] },
     { id: 'patients', label: 'Patient Directory', icon: Users, path: '/patients', roles: ['ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'] },
     { id: 'appointments', label: 'Appointments', icon: Calendar, path: '/appointments', roles: ['ADMIN', 'DOCTOR', 'RECEPTIONIST'] },
     { id: 'emr', label: 'EMR Consultation', icon: Stethoscope, path: '/emr', roles: ['ADMIN', 'DOCTOR'] },
