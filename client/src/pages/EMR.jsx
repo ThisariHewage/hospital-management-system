@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { useAuth } from '../context/AuthContext';
-import { Stethoscope, User, HeartPulse, Pill, Plus, Trash2, CheckCircle2, History, AlertCircle } from 'lucide-react';
+import { Stethoscope, User, HeartPulse, Pill, Plus, Trash2, CheckCircle2, History, AlertCircle, Printer, X } from 'lucide-react';
 
 const AVAILABLE_MEDS = [
     { id: 1, name: 'Amoxicillin 500mg', category: 'Antibiotics' },
@@ -37,6 +37,8 @@ export default function EMR() {
     const [savedSuccess, setSavedSuccess] = useState(false);
     const [saveError, setSaveError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [records, setRecords] = useState([]);
+    const [showHistory, setShowHistory] = useState(false);
 
     useEffect(() => {
         const fetchPatients = async () => {
@@ -53,6 +55,26 @@ export default function EMR() {
     }, []);
 
     const selectedPatient = patients.find(p => p.id === Number(selectedPatientId));
+
+    const loadHistory = async () => {
+        if (!selectedPatientId) return;
+        try {
+            const res = await api.get(`/emr?patient_id=${selectedPatientId}`);
+            setRecords(res.data?.records || []);
+            setShowHistory(true);
+        } catch (error) { setSaveError(error.response?.data?.message || 'Unable to load treatment history.'); }
+    };
+
+    const printReport = (record) => {
+        let details = {};
+        try { details = typeof record.notes === 'string' ? JSON.parse(record.notes || '{}') : (record.notes || {}); } catch { details = {}; }
+        const vitalsText = Object.entries(details.vitals || {}).map(([key, value]) => `${key}: ${value}`).join(' | ') || 'Not recorded';
+        const medications = (details.prescriptions || []).map(item => `<li>${item.medicine_name} — ${item.dosage}, ${item.frequency}, ${item.duration}</li>`).join('') || '<li>No prescriptions recorded</li>';
+        const report = window.open('', '_blank', 'width=800,height=900');
+        if (!report) return;
+        report.document.write(`<html><head><title>Medical Report</title><style>body{font-family:Arial;padding:40px;color:#1e293b}h1{color:#0f766e}h2{border-bottom:1px solid #ccc;padding-bottom:6px}p{line-height:1.5}.meta{color:#475569}</style></head><body><h1>MediCore Hospital — Medical Report</h1><p class="meta">Patient: <b>${record.patient_name}</b> (${record.patient_code})<br>Consulting Doctor: ${record.doctor_name}<br>Visit: ${new Date(record.visit_date).toLocaleString()}</p><h2>Diagnosis</h2><p>${record.diagnosis}</p><h2>Symptoms</h2><p>${record.symptoms || 'Not recorded'}</p><h2>Vital Signs</h2><p>${vitalsText}</p><h2>Treatment Plan</h2><p>${record.treatment_plan || 'Not recorded'}</p><h2>Electronic Prescriptions</h2><ul>${medications}</ul><script>window.print()</script></body></html>`);
+        report.document.close();
+    };
 
     const addPrescriptionItem = () => {
         const newItem = {
@@ -108,6 +130,8 @@ export default function EMR() {
                     </div>
                 )}
             </div>
+
+            {selectedPatient && <div className="flex justify-end"><button type="button" onClick={loadHistory} className="inline-flex items-center gap-1.5 text-xs font-semibold bg-slate-100 text-slate-700 px-3 py-2 rounded-lg hover:bg-slate-200"><History className="w-3.5 h-3.5" /> View Treatment History & Reports</button></div>}
 
             {/* Patient Selector Strip */}
             <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
@@ -345,6 +369,8 @@ export default function EMR() {
                     </button>
                 </div>
             </form>
+
+            {showHistory && <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex justify-center items-center p-4"><div className="bg-white w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl p-6"><div className="flex justify-between border-b pb-3"><div><h2 className="font-bold text-slate-800">Treatment History & Medical Reports</h2><p className="text-xs text-slate-500">{selectedPatient?.full_name}</p></div><button onClick={() => setShowHistory(false)}><X className="w-5 h-5" /></button></div><div className="mt-4 space-y-3">{records.length ? records.map(record => <div key={record.id} className="border rounded-xl p-4"><div className="flex justify-between gap-3"><div><p className="font-semibold text-slate-800">{record.diagnosis}</p><p className="text-xs text-slate-500">{new Date(record.visit_date).toLocaleString()} · {record.doctor_name}</p></div><button onClick={() => printReport(record)} className="inline-flex h-fit items-center gap-1 text-xs text-teal-700 bg-teal-50 px-2.5 py-1.5 rounded-lg"><Printer className="w-3.5 h-3.5" /> Print Report</button></div><p className="mt-2 text-xs text-slate-600"><b>Treatment:</b> {record.treatment_plan || 'Not recorded'}</p></div>) : <p className="text-sm text-slate-500 text-center py-8">No medical records available for this patient.</p>}</div></div></div>}
         </div>
     );
 }
