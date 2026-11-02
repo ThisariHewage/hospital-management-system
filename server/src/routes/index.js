@@ -5,7 +5,7 @@ import { getPatients, getPatientById, createPatient, updatePatient, uploadPatien
 import { getAppointments, getDoctors, getDepartments, createDoctor, updateDoctor, createAppointment, updateAppointmentStatus, rescheduleAppointment } from '../controllers/appointmentController.js';
 import {
     getConsultationPatients, getMedicalRecords, createMedicalRecord,
-    getLabTests, updateLabSampleStatus, updateLabResult,
+    getLabTests, createLabTest, updateLabSampleStatus, updateLabResult,
     getMedicines, addMedicine, dispenseMedicine, getPrescriptionQueue, dispensePrescription
 } from '../controllers/clinicalController.js';
 import { getBills, getBillById, createBill, recordPayment } from '../controllers/billingController.js';
@@ -28,7 +28,7 @@ router.use('/auth', authRoutes);
 router.use('/audit-logs', verifyToken, requireRoles('ADMIN'), auditRoutes);
 
 // Patients Routes (ADMIN, DOCTOR, NURSE, RECEPTIONIST)
-router.get('/patients', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getPatients);
+router.get('/patients', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST', 'LAB_STAFF'), getPatients);
 router.get('/patients/:id', verifyToken, requireRoles('ADMIN', 'DOCTOR', 'NURSE', 'RECEPTIONIST'), getPatientById);
 router.post('/patients', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), createPatient);
 router.patch('/patients/:id', verifyToken, requireRoles('ADMIN', 'RECEPTIONIST'), updatePatient);
@@ -58,6 +58,7 @@ router.post('/emr', verifyToken, requireRoles('ADMIN', 'DOCTOR'), createMedicalR
 
 // Laboratory Tests (ADMIN, LAB_STAFF)
 router.get('/laboratory', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), getLabTests);
+router.post('/laboratory', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), createLabTest);
 router.patch('/laboratory/:id/sample', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), updateLabSampleStatus);
 router.patch('/laboratory/:id/result', verifyToken, requireRoles('ADMIN', 'LAB_STAFF'), updateLabResult);
 

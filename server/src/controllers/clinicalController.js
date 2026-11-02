@@ -158,6 +158,24 @@ export const getLabTests = async (req, res) => {
     }
 };
 
+export const createLabTest = async (req, res) => {
+    try {
+        const { patient_id, test_name, category, sample_type, normal_range, cost } = req.body;
+        if (!patient_id || !test_name || !category) return res.status(400).json({ success: false, message: 'Patient, test name, and category are required.' });
+        const testCode = `LAB-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
+        const [result] = await pool.query(
+            `INSERT INTO lab_tests (test_code, patient_id, test_name, category, sample_type, normal_range, cost)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [testCode, patient_id, test_name, category, sample_type || 'Blood', normal_range || null, cost || 30]
+        );
+        await logAudit(req.user?.id, 'CREATE_LAB_TEST_REQUEST', 'lab_tests', result.insertId, `Created laboratory request ${testCode}`, req);
+        res.status(201).json({ success: true, testId: result.insertId, test_code: testCode });
+    } catch (error) {
+        console.error('createLabTest error:', error);
+        res.status(500).json({ success: false, message: 'Failed to create laboratory test request.' });
+    }
+};
+
 export const updateLabSampleStatus = async (req, res) => {
     try {
         const { id } = req.params;
@@ -296,6 +314,7 @@ export default {
     getConsultationPatients,
     getMedicalRecords,
     createMedicalRecord,
+    createLabTest,
     getLabTests,
     updateLabSampleStatus,
     updateLabResult,

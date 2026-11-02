@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { TestTube2, CheckCircle2, Clock, FileCheck, Search, Filter, X } from 'lucide-react';
+import { TestTube2, CheckCircle2, Clock, FileCheck, Search, Filter, X, Plus, Printer } from 'lucide-react';
 
 const INITIAL_TESTS = [
     { id: 1, test_code: 'LAB-2026-001', patient_name: 'James Wilson', patient_code: 'PAT-2026-0001', test_name: 'Lipid Profile Comprehensive', sample_type: 'Blood Serum', sample_status: 'COLLECTED', test_status: 'IN_PROGRESS', results: '', normal_range: 'Total Cholesterol < 200 mg/dL, HDL > 40 mg/dL, LDL < 100 mg/dL' },
@@ -14,6 +14,9 @@ export default function Laboratory() {
     const [statusFilter, setStatusFilter] = useState('');
     const [selectedTest, setSelectedTest] = useState(null);
     const [resultText, setResultText] = useState('');
+    const [patients, setPatients] = useState([]);
+    const [isRequestOpen, setIsRequestOpen] = useState(false);
+    const [request, setRequest] = useState({ patient_id: '', test_name: '', category: 'Hematology', sample_type: 'Blood', normal_range: '', cost: '30' });
 
     const fetchTests = async () => {
         try {
@@ -26,6 +29,7 @@ export default function Laboratory() {
 
     useEffect(() => {
         fetchTests();
+        api.get('/patients').then(res => setPatients(res.data?.patients || [])).catch(() => setPatients([]));
     }, []);
 
     const handleCollectSample = async (testId) => {
@@ -53,6 +57,23 @@ export default function Laboratory() {
         }
     };
 
+    const handleCreateRequest = async (e) => {
+        e.preventDefault();
+        try {
+            await api.post('/laboratory', request);
+            await fetchTests();
+            setIsRequestOpen(false);
+            setRequest({ patient_id: '', test_name: '', category: 'Hematology', sample_type: 'Blood', normal_range: '', cost: '30' });
+        } catch (error) { alert(error.response?.data?.message || 'Unable to create test request.'); }
+    };
+
+    const printReport = (test) => {
+        const report = window.open('', '_blank', 'width=800,height=900');
+        if (!report) return;
+        report.document.write(`<html><head><title>Laboratory Report</title><style>body{font-family:Arial;padding:40px;color:#1e293b}h1{color:#0f766e}h2{border-bottom:1px solid #ccc;padding-bottom:6px}p{line-height:1.6}.meta{color:#475569}</style></head><body><h1>MediCore Hospital — Laboratory Report</h1><p class="meta">Report: <b>${test.test_code}</b><br>Patient: <b>${test.patient_name}</b> (${test.patient_code})<br>Requested: ${new Date(test.requested_at).toLocaleString()}<br>Completed: ${test.completed_at ? new Date(test.completed_at).toLocaleString() : 'Pending'}</p><h2>${test.test_name}</h2><p><b>Category:</b> ${test.category}<br><b>Sample:</b> ${test.sample_type}<br><b>Reference range:</b> ${test.normal_range || 'Not specified'}</p><h2>Verified Results</h2><p>${(test.results || 'Results pending.').replace(/\n/g, '<br>')}</p><script>window.print()</script></body></html>`);
+        report.document.close();
+    };
+
     const filtered = tests.filter(t => {
         const matchesSearch = t.patient_name?.toLowerCase().includes(search.toLowerCase()) ||
             t.test_code?.toLowerCase().includes(search.toLowerCase()) ||
@@ -68,6 +89,7 @@ export default function Laboratory() {
                     <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Laboratory Order & Result Desk</h1>
                     <p className="text-sm text-slate-500">Manage sample collection, diagnostic analysis, and verified pathology reports</p>
                 </div>
+                <button onClick={() => setIsRequestOpen(true)} className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2.5 rounded-lg text-sm font-semibold"><Plus className="w-4 h-4" /> New Test Request</button>
             </div>
 
             {/* Filter toolbar */}
@@ -156,6 +178,7 @@ export default function Laboratory() {
                                         >
                                             {t.test_status === 'COMPLETED' ? 'View/Edit Result' : 'Enter Results'}
                                         </button>
+                                        {t.test_status === 'COMPLETED' && <button onClick={() => printReport(t)} className="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg"><Printer className="inline w-3.5 h-3.5 mr-1" /> Report</button>}
                                     </td>
                                 </tr>
                             ))}
@@ -209,6 +232,8 @@ export default function Laboratory() {
                     </div>
                 </div>
             )}
+
+            {isRequestOpen && <div className="fixed inset-0 z-50 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4"><div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"><div className="flex justify-between border-b pb-3 mb-4"><h3 className="font-bold">Create Laboratory Test Request</h3><button onClick={() => setIsRequestOpen(false)}><X /></button></div><form onSubmit={handleCreateRequest} className="space-y-3"><select required value={request.patient_id} onChange={e => setRequest({ ...request, patient_id: e.target.value })} className="w-full border rounded-lg px-3 py-2 text-sm"><option value="">Select patient</option>{patients.map(p => <option key={p.id} value={p.id}>{p.full_name} ({p.patient_code})</option>)}</select><input required value={request.test_name} onChange={e => setRequest({ ...request, test_name: e.target.value })} placeholder="Test name" className="w-full border rounded-lg px-3 py-2 text-sm" /><div className="grid grid-cols-2 gap-3"><input required value={request.category} onChange={e => setRequest({ ...request, category: e.target.value })} placeholder="Category" className="border rounded-lg px-3 py-2 text-sm" /><input value={request.sample_type} onChange={e => setRequest({ ...request, sample_type: e.target.value })} placeholder="Sample type" className="border rounded-lg px-3 py-2 text-sm" /></div><input value={request.normal_range} onChange={e => setRequest({ ...request, normal_range: e.target.value })} placeholder="Reference range" className="w-full border rounded-lg px-3 py-2 text-sm" /><input type="number" min="0" step="0.01" value={request.cost} onChange={e => setRequest({ ...request, cost: e.target.value })} placeholder="Test cost" className="w-full border rounded-lg px-3 py-2 text-sm" /><button className="w-full bg-teal-600 text-white py-2 rounded-lg text-sm font-semibold">Create Request</button></form></div></div>}
         </div>
     );
 }
